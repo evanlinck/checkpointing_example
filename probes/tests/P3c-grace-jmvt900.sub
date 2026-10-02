@@ -1,0 +1,15 @@
+# P3c - Vacate grace window: P3c-grace-jmvt900
+# @question: If a job asks for job_max_vacate_time = 900, is it capped by the machine's MachineMaxVacateTime?
+# @sites: chtc ospool
+# @triggers: vacate:90
+# The probe logs the signal, ignores it, and keeps writing a 1 s heartbeat (streamed stdout,
+# and a file on /staging where available) until HTCondor kills it. Last heartbeat - signal time = grace.
+# It checkpoints once at step 5 (exit 85, in-place restart). After the eviction the job
+# is rescheduled into a new sandbox; seeing that checkpoint come back, it exits 0 at once.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+stream_error  = true
+job_max_vacate_time = 900
+arguments = $(PROBE_ARGS) --on-sigterm ignore --heartbeat-every 1 --voluntary-exit-at 5 --exit-on-restart --total-steps 3000 $(HEARTBEAT_ARGS) 

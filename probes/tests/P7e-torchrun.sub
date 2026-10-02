@@ -1,0 +1,19 @@
+# P7e - Signal delivery through torchrun
+# @question: OPT-IN, needs pytorch.sif. When HTCondor sends SIGTERM to torchrun, do the workers receive it? If a worker's save takes 60 s, does torchrun wait for it, or kill the workers first (and after how long)?
+# @sites: chtc
+# @triggers: vacate:90
+# @optin
+# Each worker logs the signal and starts a 60 s (pretend) save. Compare each rank's
+# save_done/exit times with the signal time to see whether torchrun let them finish.
+# After the restart the job simply runs to the end (5 min) and exits 0.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+stream_error  = true
+executable = $(PROBES)/run_torchrun.sh
+transfer_input_files = $(PROBES)/probe.py
+container_image = $(OSDF_STAGING)/images/pytorch.sif
+request_cpus = 2
+request_memory = 4GB
+arguments = $(PROBE_ARGS) --on-sigterm save85 --save-seconds 60 --heartbeat-every 1 --total-steps 300

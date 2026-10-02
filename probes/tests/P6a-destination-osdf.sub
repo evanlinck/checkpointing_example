@@ -1,0 +1,11 @@
+# P6a - checkpoint_destination on OSDF
+# @question: Does checkpoint_destination = osdf://... (our /staging namespace) work, from CHTC and from the OSPool? After a vacate, does the restart get the checkpoint back from there?
+# @sites: chtc ospool
+# @triggers: vacate:150
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+checkpoint_destination    = $(OSDF_STAGING)/ckptdest/$(Cluster).$(Process)
+stream_output = true
+stream_error  = true
+arguments = $(PROBE_ARGS) --store destination --voluntary-exit-at 60 --on-sigterm save85 --total-steps 360

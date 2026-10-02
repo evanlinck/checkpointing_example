@@ -1,0 +1,7 @@
+# P8d - Failure mode: P8d-empty-ckpt-dir
+# @question: What happens when the job exits 85 and the checkpoint directory exists but is empty? (The probe stops after 3 such exits in one sandbox.)
+# @sites: chtc ospool
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+arguments = $(PROBE_ARGS) --voluntary-exit-at 30 --empty-checkpoint --max-voluntary-exits 3 --total-steps 60

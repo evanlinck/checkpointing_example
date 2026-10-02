@@ -1,0 +1,7 @@
+# P8a - Failure mode: P8a-missing-ckpt-file
+# @question: What happens when the job exits 85 but a path listed in transfer_checkpoint_files does not exist? (Hold? Error? Ignored?)
+# @sites: chtc ospool
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt, this_file_does_not_exist.txt
+transfer_output_files     = ckpt, out
+arguments = $(PROBE_ARGS) --voluntary-exit-at 30 --total-steps 60

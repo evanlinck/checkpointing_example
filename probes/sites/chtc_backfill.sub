@@ -1,0 +1,14 @@
+# sites/chtc_backfill.sub - CHTC GPU *backfill* slots.
+# At CHTC, backfill is essentially a GPU-slot thing (CPU slots are plentiful).
+# +is_resumable = true only makes a job ELIGIBLE for backfill; on its own the first
+# smoke run landed on an ordinary GPU Lab slot. So we also REQUIRE a backfill slot.
+# BackfillSlot is the machine attribute CHTC's own ConcurrencyLimits expression checks.
+# Jobs may wait longer to match. The probe never uses the GPU; keep the test list short.
+SITE_REQS = (TARGET.BackfillSlot =?= true)
+request_gpus  = 1
++WantGPULab   = true
++GPUJobLength = "short"
++is_resumable = true
+
+container_image = $(OSDF_STAGING)/images/python312.sif
+HEARTBEAT_ARGS = --heartbeat-dir $(STAGING_RUNS)/$(Cluster).$(Process)

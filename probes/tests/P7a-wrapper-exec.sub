@@ -1,0 +1,14 @@
+# P7a - Signal delivery: P7a-wrapper-exec
+# @question: When the executable is a shell script that execs python, does python receive the soft-kill signal?
+# @sites: chtc
+# @triggers: vacate:90
+# @variants: bare
+# The probe pretends its save takes 20 s, so we can see whether anything dies while the save is running.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+stream_error  = true
+executable = $(PROBES)/run_exec.sh
+transfer_input_files = $(PROBES)/probe.py
+arguments = $(PROBE_ARGS) --on-sigterm save85 --save-seconds 20 --voluntary-exit-at 5 --exit-on-restart --total-steps 240 --children 0

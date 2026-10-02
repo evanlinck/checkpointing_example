@@ -1,0 +1,22 @@
+# P7h - Version-independent graceful shutdown for torchrun (stop file + exit-code mapping)
+# @question: OPT-IN, needs pytorch.sif. If a wrapper turns SIGTERM into a STOP file instead of forwarding it, do the torchrun workers finish a 60 s save (no 30 s kill)? Does the wrapper's mapping make a voluntary exit 85 restart the job in place, and does the SIGTERM save survive eviction?
+# @sites: chtc
+# @triggers: vacate:160
+# @optin
+# Timeline (torchrun + import torch takes ~18 s per start, and every save takes 60 s here):
+# both workers exit 85 at step 10 (~90 s in; wrapper maps torchrun's 1 -> 85, job restarts in place).
+# Vacate 160 s after the first start, i.e. well inside the second run (the first attempt fired
+# 1 s after the planned exit, before the restart, so the stop-file path never ran): the wrapper creates STOP_REQUESTED, workers save for 60 s,
+# exit, wrapper exits 85. ON_EXIT_OR_EVICT ships that save; the rescheduled job restores it and exits.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+stream_output = true
+stream_error  = true
+executable = $(PROBES)/run_torchrun_stopfile.sh
+transfer_input_files = $(PROBES)/probe.py
+container_image = $(OSDF_STAGING)/images/pytorch.sif
+request_cpus = 2
+request_memory = 4GB
+arguments = $(PROBE_ARGS) --on-sigterm save85 --save-seconds 60 --voluntary-exit-at 10 --exit-on-restart --heartbeat-every 1 --total-steps 300

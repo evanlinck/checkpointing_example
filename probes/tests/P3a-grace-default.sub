@@ -1,0 +1,15 @@
+# P3a - Vacate grace window: P3a-grace-default
+# @question: How long between the soft-kill signal and SIGKILL, with default settings? Is there a retirement delay between the trigger and the signal? Does condor_hold behave like a vacate?
+# @sites: chtc chtc_gpu chtc_backfill ospool
+# @triggers: vacate:90 hold-release:90
+# The probe logs the signal, ignores it, and keeps writing a 1 s heartbeat (streamed stdout,
+# and a file on /staging where available) until HTCondor kills it. Last heartbeat - signal time = grace.
+# It checkpoints once at step 5 (exit 85, in-place restart). After the eviction the job
+# is rescheduled into a new sandbox; seeing that checkpoint come back, it exits 0 at once.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+stream_error  = true
+
+arguments = $(PROBE_ARGS) --on-sigterm ignore --heartbeat-every 1 --voluntary-exit-at 5 --exit-on-restart --total-steps 3000 $(HEARTBEAT_ARGS) 

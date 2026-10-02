@@ -1,0 +1,7 @@
+# P0 - Environment fingerprint
+# @question: What does this pool give a job? HTCondor version, vacate/retirement settings, /staging, internet, container, condor_chirp, GPUs, inherited signal masks.
+# @sites: chtc chtc_gpu chtc_backfill ospool
+# @variants: bare
+# Writes out/fingerprint.json plus the full job and machine ads (out/job_ad.txt, out/machine_ad.txt).
++WantIOProxy = true
+arguments = $(PROBE_ARGS) --mode fingerprint --staging-dir $(STAGING_RUNS)/$(Cluster).$(Process)

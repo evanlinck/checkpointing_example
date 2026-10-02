@@ -1,0 +1,9 @@
+# sites/chtc_gpu.sub - CHTC GPU Lab slots (vacate policy may differ from CPU slots).
+# CONFIRM these attributes against CHTC's current GPU guide.
+SITE_REQS = true
+request_gpus = 1
++WantGPULab = true
++GPUJobLength = "short"
+
+container_image = $(OSDF_STAGING)/images/python312.sif
+HEARTBEAT_ARGS = --heartbeat-dir $(STAGING_RUNS)/$(Cluster).$(Process)

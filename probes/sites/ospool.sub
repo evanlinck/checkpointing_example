@@ -1,0 +1,9 @@
+# sites/ospool.sub - the OSPool, reached from ap2002 by flocking.
+want_ospool = true
+SITE_REQS = (Poolname =!= "CHTC")
+
+container_image = $(OSDF_STAGING)/images/python312.sif
+
+# OSPool execute points do not mount /staging, so no heartbeat file there;
+# P3 relies on stream_output for its heartbeat instead.
+HEARTBEAT_ARGS =

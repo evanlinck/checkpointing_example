@@ -1,0 +1,14 @@
+# P7b - Signal delivery: P7b-wrapper-noexec
+# @question: When a shell wrapper runs python WITHOUT exec, who gets the signal: only bash, or python too? Is python killed before it finishes saving?
+# @sites: chtc
+# @triggers: vacate:90
+# @variants: bare
+# The probe pretends its save takes 20 s, so we can see whether anything dies while the save is running.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+stream_error  = true
+executable = $(PROBES)/run_noexec.sh
+transfer_input_files = $(PROBES)/probe.py
+arguments = $(PROBE_ARGS) --on-sigterm save85 --save-seconds 20 --voluntary-exit-at 5 --exit-on-restart --total-steps 240 --children 0

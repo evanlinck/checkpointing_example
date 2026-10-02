@@ -1,0 +1,10 @@
+# P4b - Staging mode: hard kill in the middle of a large save
+# @question: After a hard kill (condor_vacate_job -fast) in the middle of writing a 1 GB checkpoint to /staging, does the next start find a stale .tmp directory, and does it correctly resume from the previous complete checkpoint?
+# @sites: chtc
+# @triggers: vacate-fast:120
+# Saves back-to-back (every step) so the kill almost certainly lands mid-save. Uses ~3 GB of /staging at peak.
+TEST_REQS = (HasCHTCStaging =?= true)
+checkpoint_exit_code = 85
+stream_output = true
+stream_error  = true
+arguments = $(PROBE_ARGS) --store staging --ckpt-dir $(STAGING_RUNS)/$(Cluster).$(Process)/ckpt --periodic-every 1 --ckpt-mb 1000 --ckpt-files 8 --on-sigterm save85 --total-steps 300

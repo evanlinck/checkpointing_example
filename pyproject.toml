@@ -1,0 +1,18 @@
+# Development environment only (uv). This repository is not an installable package yet:
+# the shared code in htcondor_ckpt/ is written to become one later (see CLAUDE.md).
+# Each recipe pins its own runtime requirements in its own directory.
+[project]
+name = "checkpointing-examples"
+version = "0.1.0"
+description = "Checkpointing recipes for AI training jobs on HTCondor (CHTC and the OSPool)"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv]
+# Don't build or install this project; uv just manages the dev environment.
+package = false

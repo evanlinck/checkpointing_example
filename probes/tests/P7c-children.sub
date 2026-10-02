@@ -1,0 +1,13 @@
+# P7c - Signal delivery: P7c-children
+# @question: Do child processes (like DataLoader workers) receive the signal directly? Does a child that does not handle it die while the parent is still saving?
+# @sites: chtc
+# @triggers: vacate:90
+# @variants: bare
+# The probe pretends its save takes 20 s, so we can see whether anything dies while the save is running.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+stream_error  = true
+
+arguments = $(PROBE_ARGS) --on-sigterm save85 --save-seconds 20 --voluntary-exit-at 5 --exit-on-restart --total-steps 240 --children 2

@@ -1,0 +1,20 @@
+# P7g - torchrun with a longer shutdown timeout
+# @question: OPT-IN, needs pytorch.sif. With TORCH_ELASTIC_SHUTDOWN_TIMEOUT=120, does torchrun let the workers finish a 60 s save after SIGTERM (P7e showed it kills them after ~30 s by default)? Does the installed torch support the setting at all?
+# @sites: chtc
+# @triggers: vacate:90
+# @optin
+# Same as P7e except for the environment line. If it works, each rank logs save_done ~60 s
+# after the signal, and the eviction event comes ~60 s (not ~30 s) after the trigger.
+# The env var (rather than --shutdown-timeout) is used so an older torchrun simply ignores it.
+environment = "TORCH_ELASTIC_SHUTDOWN_TIMEOUT=120"
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+stream_error  = true
+executable = $(PROBES)/run_torchrun.sh
+transfer_input_files = $(PROBES)/probe.py
+container_image = $(OSDF_STAGING)/images/pytorch.sif
+request_cpus = 2
+request_memory = 4GB
+arguments = $(PROBE_ARGS) --on-sigterm save85 --save-seconds 60 --heartbeat-every 1 --total-steps 300

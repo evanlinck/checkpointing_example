@@ -1,0 +1,6 @@
+# P5b - Write throughput at 10 GB
+# @question: Same as P5a at 10 GB (recipe-3 scale). Does the /staging quota or request_disk get in the way?
+# @sites: chtc
+# @optin
+request_disk = 25GB
+arguments = $(PROBE_ARGS) --mode bench --bench-targets .,$(STAGING_RUNS)/$(Cluster).$(Process) --bench-mb 10000 --bench-files 1,64

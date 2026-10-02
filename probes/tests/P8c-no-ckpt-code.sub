@@ -1,0 +1,5 @@
+# P8c - Failure mode: P8c-no-ckpt-code
+# @question: Sanity check: without checkpoint_exit_code, is exit 85 simply treated as the job finishing (with return value 85)?
+# @sites: chtc ospool
+transfer_output_files = ckpt, out
+arguments = $(PROBE_ARGS) --voluntary-exit-at 30 --total-steps 60

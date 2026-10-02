@@ -1,0 +1,11 @@
+# P4a - Staging mode: checkpoints written straight to /staging
+# @question: Is a SIGTERM save to /staging durable and found after the job is rescheduled (possibly on another host)? Do directory rename, fsync, and an atomic 'latest' pointer work on /staging? Is /staging visible inside the container?
+# @sites: chtc chtc_backfill
+# @variants: bare
+# @triggers: vacate:150
+# No transfer_checkpoint_files: nothing goes through spool. exit 85 is still used for the voluntary exit.
+TEST_REQS = (HasCHTCStaging =?= true)
+checkpoint_exit_code = 85
+stream_output = true
+stream_error  = true
+arguments = $(PROBE_ARGS) --store staging --ckpt-dir $(STAGING_RUNS)/$(Cluster).$(Process)/ckpt --voluntary-exit-at 60 --periodic-every 30 --on-sigterm save85 --total-steps 420 $(HEARTBEAT_ARGS)

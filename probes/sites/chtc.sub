@@ -1,0 +1,8 @@
+# sites/chtc.sub - ordinary CHTC CPU slots.
+SITE_REQS = true
+
+# Run inside our small Python container. make_dag.py removes this line for the "-bare" variants.
+container_image = $(OSDF_STAGING)/images/python312.sif
+
+# A 1 s heartbeat file on /staging survives SIGKILL, so we can see exactly when the job died.
+HEARTBEAT_ARGS = --heartbeat-dir $(STAGING_RUNS)/$(Cluster).$(Process)

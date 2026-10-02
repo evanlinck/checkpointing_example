@@ -1,0 +1,7 @@
+# P8b - Failure mode: P8b-rapid-exits
+# @question: What happens when a job exits 85 every 5 seconds, 12 times? Throttling, a hold after N restarts, or nothing?
+# @sites: chtc ospool
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+arguments = $(PROBE_ARGS) --voluntary-exit-at 5,10,15,20,25,30,35,40,45,50,55,60 --total-steps 70

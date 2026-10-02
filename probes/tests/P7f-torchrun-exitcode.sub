@@ -1,0 +1,17 @@
+# P7f - Does a worker's exit 85 survive torchrun?
+# @question: OPT-IN, needs pytorch.sif. If every torchrun worker saves and exits 85, what exit code does HTCondor see from torchrun: 85 (restart) or something else (job completes or fails)?
+# @sites: chtc
+# @optin
+# Both workers exit 85 at step 30. If torchrun passes 85 through, HTCondor restarts the job
+# in place and it finishes at step 60 with exit 0. Otherwise the job ends early (see "Final job state").
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+stream_error  = true
+executable = $(PROBES)/run_torchrun.sh
+transfer_input_files = $(PROBES)/probe.py
+container_image = $(OSDF_STAGING)/images/pytorch.sif
+request_cpus = 2
+request_memory = 4GB
+arguments = $(PROBE_ARGS) --voluntary-exit-at 30 --total-steps 60

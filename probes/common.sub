@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# common.sub - lines shared by every probe job.
+# make_dag.py builds each job.sub as: common.sub + sites/<site>.sub + tests/<test>.sub
+# Later lines override earlier ones, so a test can override anything here.
+# ---------------------------------------------------------------------------
+
+# WARNING: STAGING_DIR is NOT set in this file. Before running make_dag.py:
+#     export PROBE_STAGING_DIR=/staging/<username>
+# STAGING_DIR (your /staging directory) is written into each generated job.sub by
+# make_dag.py from --staging-dir or $PROBE_STAGING_DIR, so no personal path lives here.
+# Where the probe's checkpoint/heartbeat/benchmark directories go on /staging:
+STAGING_RUNS = $(STAGING_DIR)/ckpt-probes/runs
+# The same area as an OSDF URL (/staging/... is served as osdf:///chtc/staging/...):
+OSDF_STAGING = osdf:///chtc$(STAGING_DIR)/ckpt-probes
+
+# Arguments every probe gets: which test it is and its own job id.
+PROBE_ARGS = --test $(TEST_NAME) --job-id $(Cluster).$(Process)
+
+universe       = vanilla
+executable     = $(PROBES)/probe.py
+log            = job.log
+output         = job.out
+error          = job.err
+
+request_cpus   = 1
+request_memory = 1GB
+request_disk   = 2GB
+
+should_transfer_files = YES
+transfer_output_files = out
+
+# Tests append to this (e.g. HasCHTCStaging); sites define SITE_REQS.
+TEST_REQS = true
+
+# Safety net so a misbehaving probe can never loop or sit held for long:
+# remove it after 2 hours in the queue, or after 30 minutes on hold. (A held job counts as held from the
+# moment of condor_hold, while it may still be using up to 15 min of vacate grace; see P3 hold-release.)
+periodic_remove = ((time() - QDate) > 7200) || (JobStatus == 5 && (time() - EnteredCurrentStatus) > 1800)

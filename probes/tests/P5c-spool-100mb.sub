@@ -1,0 +1,9 @@
+# P5c - Spool transfer cost for a 100 MB checkpoint
+# @question: How long is the gap between exit 85 and the restart when the checkpoint is 100 MB (transfer to the AP's spool)?
+# @sites: chtc ospool
+
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+request_disk = 2GB
+arguments = $(PROBE_ARGS) --voluntary-exit-at 30 --ckpt-mb 100 --ckpt-files 1 --keep 1 --total-steps 60

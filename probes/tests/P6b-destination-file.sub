@@ -1,0 +1,12 @@
+# P6b - checkpoint_destination with a file:// URL on /staging
+# @question: Does checkpoint_destination = file:///staging/... work on CHTC execute points that mount /staging?
+# @sites: chtc
+# @triggers: vacate:150
+TEST_REQS = (HasCHTCStaging =?= true)
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+checkpoint_destination    = file://$(STAGING_RUNS)/$(Cluster).$(Process)/ckptdest
+stream_output = true
+stream_error  = true
+arguments = $(PROBE_ARGS) --store destination --voluntary-exit-at 60 --on-sigterm save85 --total-steps 360

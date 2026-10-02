@@ -1,0 +1,6 @@
+# P5a - Write throughput: job scratch vs /staging
+# @question: How long does writing (with fsync) and renaming a 100 MB / 1 GB checkpoint take, as 1 file and as 64 files, on local scratch and on /staging?
+# @sites: chtc ospool
+# On the OSPool the /staging target simply fails and is recorded as such.
+request_disk = 4GB
+arguments = $(PROBE_ARGS) --mode bench --bench-targets .,$(STAGING_RUNS)/$(Cluster).$(Process) --bench-mb 100,1000 --bench-files 1,64

@@ -1,0 +1,15 @@
+# P2a - Vacate in spool mode, on-sigterm=save85
+# @question: KEY TEST. If SIGTERM arrives after a voluntary checkpoint (step A) and the handler saves step B and exits 85, which step does the restarted job see: A or B? (Only checkpoint_exit_code is set.)
+# @sites: chtc chtc_backfill ospool
+# @triggers: vacate:150 vacate-fast:150 hold-release:150
+# Timeline: voluntary checkpoint at step 60 (call it A), restart, keep running;
+# trigger fires ~150 s after the first start (step ~140); on SIGTERM the probe
+# behaves per --on-sigterm. On the next start, the restored step tells us what survived.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+# Stream stdout so we can see the evicted execution's own log lines.
+stream_output = true
+stream_error  = true
+
+arguments = $(PROBE_ARGS) --voluntary-exit-at 60 --on-sigterm save85 --total-steps 420

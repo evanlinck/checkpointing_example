@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# macOS
+.DS_Store
+
+# Probe results: keep the human-readable summaries (cited by docs/environment.md);
+# raw job files (job.out, job.log, ads, checkpoints) stay local.
+results/**
+!results/**/
+!results/**/*.md
