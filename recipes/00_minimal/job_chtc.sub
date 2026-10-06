@@ -1,0 +1,70 @@
+# Recipe 0 on CHTC: a job that checkpoints, gets restarted, and resumes.
+# Submit with:  condor_submit job_chtc.sub
+# First replace the <...> placeholder in container_image.
+
+# The command to run. `exec` matters: HTCondor sends its "please stop" signal
+# (SIGTERM) only to the job's top process. `shell` starts /bin/sh, and `exec` makes
+# the shell replace itself with Python, so Python is the process that hears it.
+# The same command works for the first start and every restart: train.py resumes
+# from its newest checkpoint automatically.
+#   --max-runtime-seconds      save and exit 85 every hour (the timed checkpoint)
+#   --step-delay               slows this toy model down so the job runs long enough to interrupt
+shell                     = exec python3 train.py --max-runtime-seconds 3600 --step-delay 0.1
+# Alternative to `shell`: a wrapper script that does the same `exec` (see run.sh).
+# executable              = run.sh
+# arguments               = --max-runtime-seconds 3600 --step-delay 0.1
+
+# Files copied to the machine where the job runs.
+transfer_input_files      = train.py
+
+# --- Checkpointing ---
+# Exit code 85 means "progress saved, restart me". Without this line, HTCondor
+# would treat exit 85 as the job finishing.
+checkpoint_exit_code      = 85
+# What HTCondor keeps between runs: the checkpoint directory. List one directory,
+# and make sure it exists before the first exit 85 (train.py creates it at startup);
+# a missing path puts the job on hold.
+transfer_checkpoint_files = checkpoints
+# Also keep the checkpoint directory when the job is evicted (vacate, hold, backfill
+# preemption). Without this, the save made after SIGTERM is thrown away and the job
+# restarts from its last timed checkpoint (measured; docs/environment.md §4).
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+# Name the checkpoint directory as output too. By default HTCondor only copies back
+# new top-level files, never directories, so without this line the eviction transfer
+# above would leave checkpoints/ (and the save made after SIGTERM) behind. It also
+# brings the final checkpoint back when the job ends.
+transfer_output_files     = checkpoints
+# The signal train.py listens for. SIGTERM is HTCondor's default; writing it here
+# keeps the submit file and the code in agreement.
+kill_sig                  = SIGTERM
+
+# --- Software ---
+# Run the job inside this container (Python 3, PyTorch and NumPy; see container.def).
+# It is stored on /staging and fetched through OSDF. No `universe` line is needed:
+# the default (vanilla) universe runs container jobs.
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe0.sif
+
+# --- Resources ---
+request_cpus              = 1
+request_memory            = 2GB
+request_disk              = 2GB
+
+# --- On a GPU instead: uncomment these. +is_resumable also lets the job run on
+# --- backfill slots, and (per CHTC's policy) turns reaching the GPU time limit into
+# --- a restart instead of a hold.
+# request_gpus            = 1
+# +WantGPULab             = true
+# +GPUJobLength           = "short"
+# +is_resumable           = true
+
+# --- Logs ---
+# (Comments in submit files must be on their own line: a # after a value
+#  becomes part of the value.)
+# HTCondor's record of what happened to the job (started, evicted, restarted...):
+log                       = job.log
+# What train.py prints. HTCondor appends to it across restarts, so it tells the whole story:
+output                    = job.out
+# Error messages:
+error                     = job.err
+
+queue

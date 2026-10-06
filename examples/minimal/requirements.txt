@@ -1,0 +1,6 @@
+# Versions recipe 0 was tested with. The container installs torch from the
+# CPU-only index (see container.def); locally, `pip install -r requirements.txt` is fine.
+torch==2.8.0
+numpy==2.0.2
+# Optional, only for the plot in test_local.py:
+# matplotlib

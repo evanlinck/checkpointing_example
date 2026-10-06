@@ -81,7 +81,7 @@ Possible explanation for P3c: a job's `job_max_vacate_time` above `MachineMaxVac
 | Setup | After vacate / hold | After `vacate -fast` | Tested on | Source |
 |---|---|---|---|---|
 | `checkpoint_exit_code = 85` + `transfer_checkpoint_files` | **B lost**, restarts from A | restarts from A | CHTC CPU, GPU Lab, backfill, OSPool | P2a, `core-chtc`, `backfill`, `backfill2`, `ospool` |
-| … + `when_to_transfer_output = ON_EXIT_OR_EVICT` | **B survives** | restarts from A (not from scratch) | CHTC CPU, GPU Lab, backfill, OSPool | P2b, `core-chtc`, `rest-chtc`, `backfill2`, `ospool` |
+| … + `when_to_transfer_output = ON_EXIT_OR_EVICT` **and the checkpoint directory named in `transfer_output_files`** | **B survives** | restarts from A (not from scratch) | CHTC CPU, GPU Lab, backfill, OSPool | P2b, `core-chtc`, `rest-chtc`, `backfill2`, `ospool` |
 | Checkpoint written directly to `/staging/...` | **B survives** (container and bare) | resumes from the previous complete checkpoint; a stale `step_*.tmp` dir is left behind | CHTC CPU, backfill | P4a, P4b, `core-chtc`, `backfill2` |
 | `checkpoint_destination = osdf:///chtc/staging/...` | works, but B lost (like row 1) | – | CHTC CPU, OSPool | P6a, `rest-chtc`, `ospool` |
 | `checkpoint_destination = file:///staging/...` | **fails**: upload hangs ~17 min, then "Starter failed to upload checkpoint" (code 36), hold | – | CHTC | P6b, `rest-chtc` |
@@ -110,6 +110,7 @@ Other durability facts:
 |---|---|---|
 | What HTCondor signals | **Only the top-level process.** Child processes (stand-ins for DataLoader workers) were never signaled, with or without the container. | P7c, `rest-chtc` |
 | `run.sh` with `exec python ...` | Python receives SIGTERM (bare and in Apptainer). | P7a, `rest-chtc`, `p7-rerun` |
+| Submit file `shell = exec python3 train.py ...` | Python receives SIGTERM (it saved with reason `signal` right after `condor_vacate_job`). | recipe 0 `test_htcondor.sh vacate`, CHTC, 2026-10-05 |
 | `run.sh` without `exec` | bash gets the signal (its trap runs only after Python exits); **Python never sees it** and runs until it finishes or is SIGKILLed. | P7b, `rest-chtc` |
 | Apptainer | Passes the signal through to the payload. | P7a/P7c container variants |
 | `exec torchrun` | torchrun forwards SIGTERM to its workers at once, then **kills them after ~30 s** (default shutdown timeout). A 60 s save was cut off. | P7e, `torchrun` |
@@ -136,7 +137,7 @@ Single run per number; treat these as orders of magnitude.
 
 1. **Making a SIGTERM save survive** takes one of two setups:
    - `/staging` (CHTC only), or
-   - spool with **both** `checkpoint_exit_code = 85` and `when_to_transfer_output = ON_EXIT_OR_EVICT`. This works on every pool tested and falls back to the last planned checkpoint after a hard kill.
+   - spool with `checkpoint_exit_code = 85`, `when_to_transfer_output = ON_EXIT_OR_EVICT`, **and** the checkpoint directory in `transfer_output_files`. (HTCondor's default output transfer brings back only new top-level files, not directories. Recipe 0's first vacate test left `transfer_output_files` unset and lost B; with the directory named, the rerun on 2026-10-05 restored B: the save made after SIGTERM at step 722.) This works on every pool tested and falls back to the last planned checkpoint after a hard kill.
 
    With `checkpoint_exit_code` alone, a SIGTERM save is wasted.
 2. **Planned exit-85 checkpoints are cheap** (seconds) and are the only protection against hard kills and OSPool glidein ends. Keep a timed exit (~1 h, per the HTCondor manual's suggestion) in every recipe.

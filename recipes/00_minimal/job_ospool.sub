@@ -1,0 +1,39 @@
+# Recipe 0 on the OSPool (submitted from a CHTC access point).
+# Submit with:  condor_submit job_ospool.sub
+# First replace the <...> placeholder in container_image.
+#
+# On the OSPool, HTCondor itself rarely evicts jobs. Interruptions usually come
+# from the remote site ending the pilot ("glidein") the job runs in, often with
+# no SIGTERM at all. So the timed checkpoint is what protects your work here:
+# keep --max-runtime-seconds short enough that losing one interval is acceptable.
+# See job_chtc.sub for what each line does.
+
+shell                     = exec python3 train.py --max-runtime-seconds 3600 --step-delay 0.1
+transfer_input_files      = train.py
+
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = checkpoints
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+# Name the checkpoint directory as output too. By default HTCondor only copies back
+# new top-level files, never directories, so without this line the eviction transfer
+# above would leave checkpoints/ (and the save made after SIGTERM) behind. It also
+# brings the final checkpoint back when the job ends.
+transfer_output_files     = checkpoints
+kill_sig                  = SIGTERM
+
+# Send the job to the OSPool instead of CHTC's own machines.
+want_ospool               = true
+requirements              = (Poolname =!= "CHTC")
+
+# OSPool machines can't see /staging, but they can fetch from it through OSDF.
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe0.sif
+
+request_cpus              = 1
+request_memory            = 2GB
+request_disk              = 2GB
+
+log                       = job.log
+output                    = job.out
+error                     = job.err
+
+queue

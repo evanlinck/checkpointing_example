@@ -12,8 +12,19 @@ wheels/
 # macOS
 .DS_Store
 
+# Output of running recipes and examples (checkpoints, job logs, test runs, container images)
+checkpoints/
+job.log
+job.out
+job.err
+test_*_[0-9]*.log
+test_*_[0-9]*.out
+test_*_[0-9]*.err
+*.sif
+
 # Probe results: keep the human-readable summaries (cited by docs/environment.md);
 # raw job files (job.out, job.log, ads, checkpoints) stay local.
 results/**
 !results/**/
 !results/**/*.md
+result_*.txt

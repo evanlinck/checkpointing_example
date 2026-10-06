@@ -16,8 +16,8 @@ The model is deliberately boring. The checkpointing is the content.
 
 - The five blocks every job needs, each marked with a `# ===== CHECKPOINT: <name> =====` banner:
   1. **Signal flag:** the SIGTERM handler only records the signal and the time.
-  2. **Atomic save:** write to `*.tmp/`, fsync, rename, then update `latest`.
-  3. **Resume:** `--resume auto` finds the newest complete checkpoint, skipping `.tmp` leftovers.
+  2. **Atomic save:** one file, written to `checkpoint.pt.tmp` and then renamed over `checkpoint.pt` (`os.replace`). No `fsync`, step directories, `latest` pointer or fallback: recipe 1 adds those.
+  3. **Resume:** at startup, load `checkpoint.pt` if it exists. A leftover `.tmp` file is never loaded. (Recipe 0 has no `--resume` option; recipes 1–3 add `--resume auto | <path>`.)
   4. **Stop check:** at each step boundary, on the signal flag *or* the runtime limit: save, then `sys.exit(85)`.
   5. **Finish:** final save, then `exit 0`.
 - Why exit 85 means "restart me" and exit 0 means "done".
@@ -25,8 +25,9 @@ The model is deliberately boring. The checkpointing is the content.
 
 ## Files
 
-- `train.py`: target ≤ ~200 lines including comments. Standard library + PyTorch + NumPy only.
-- `run.sh`: activates nothing fancy; `exec python train.py "$@"`, with a comment explaining why `exec` matters (HTCondor signals only the top process; docs/environment.md §6).
+- `train.py`: a flat script that reads top to bottom (settings → signal flag → the training problem → save → resume → loop with stop check → finish), ~175 lines, mostly comments, two small functions. Beginner-level explanatory comments take priority over brevity. Standard library + PyTorch + NumPy only.
+- Submit files start the job with `shell = exec python3 train.py ...` (no wrapper script, no `universe` line; `container_image` alone runs the job in the container). `run.sh` (`exec python3 train.py "$@"`) is kept as the `executable =` alternative. Both explain why `exec` matters: HTCondor signals only the top process (docs/environment.md §6).
+- The model is one line (`torch.nn.Linear(32, 4)`). Comments are written for someone checkpointing for the first time: a short note on what each line does, not just why.
 - `job_chtc.sub`: CHTC, spool mode.
 - `job_ospool.sub`: OSPool, spool mode.
 - `README.md`.
@@ -36,7 +37,7 @@ Copies of these files also go in `examples/minimal/` as the copyable starter.
 
 ## Workload
 
-- A tiny model (e.g. a small MLP or character-level model) on synthetic or bundled data, so there's nothing to download. It runs on CPU or any GPU in a few minutes.
+- A one-line model (`torch.nn.Linear`) on synthetic data, so there's nothing to download. It runs on CPU or any GPU in a few minutes.
 - Deterministic data order per epoch (seeded shuffle of indices), so the data position is just `(epoch, batch_index)`.
 
 ## What is saved
@@ -47,8 +48,8 @@ Out of scope (pointer to recipe 1 in comments): W&B, best-model export, config h
 
 ## Behavior
 
-- `--max-runtime-seconds` (default 3600) triggers the timed exit 85.
-- `--checkpoint-dir` defaults to `checkpoints/` in the sandbox (spool mode). It is created at startup, so it exists before any exit 85 (a missing listed path puts the job on hold).
+- Only the options something actually sets are command-line options: `--max-runtime-seconds` (default 3600; triggers the timed exit 85), plus `--epochs`, `--log-every` and `--step-delay` for the tests. Everything else (checkpoint directory, batch size, learning rate, seed) is a named constant at the top of `train.py`.
+- The checkpoint directory is `checkpoints/` in the sandbox (spool mode). It is created at startup, so it exists before any exit 85 (a missing listed path puts the job on hold).
 - Log one line per save: step, reason, seconds, bytes.
 - Log a "RESUMED from step X (reason)" line on resume.
 
@@ -56,11 +57,14 @@ Out of scope (pointer to recipe 1 in comments): W&B, best-model export, config h
 
 Both submit files, every line commented:
 ```
-executable                = run.sh
-arguments                 = --resume auto
+shell                     = exec python3 train.py --max-runtime-seconds 3600
+transfer_input_files      = train.py
 checkpoint_exit_code      = 85
 transfer_checkpoint_files = checkpoints
-when_to_transfer_output   = ON_EXIT_OR_EVICT   # without this, a save made after SIGTERM is lost
+# without this, a save made after SIGTERM is lost:
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+# directories are only copied back if named here:
+transfer_output_files     = checkpoints
 kill_sig                  = SIGTERM
 container_image           = osdf:///chtc/staging/<user>/<image>.sif
 ```

@@ -68,7 +68,7 @@ A minimal GPT implementation in a single `model.py` (nanoGPT-style, written fres
 
 | File | Mode | Key lines |
 |---|---|---|
-| `job_chtc.sub` | CHTC spool (default) | `checkpoint_exit_code = 85`, `transfer_checkpoint_files = checkpoints`, `when_to_transfer_output = ON_EXIT_OR_EVICT` |
+| `job_chtc.sub` | CHTC spool (default) | `checkpoint_exit_code = 85`, `transfer_checkpoint_files = checkpoints`, `when_to_transfer_output = ON_EXIT_OR_EVICT`, `transfer_output_files = checkpoints` |
 | `job_chtc_staging.sub` | CHTC `/staging` | `checkpoint_exit_code = 85`, `requirements = HasCHTCStaging =?= true`, `--ckpt-dir /staging/<user>/...` |
 | `job_ospool.sub` | OSPool spool | as `job_chtc.sub` + `want_ospool = true`, `requirements = (Poolname =!= "CHTC")` |
 
@@ -81,6 +81,7 @@ arguments                 = --config config.yaml --resume auto
 checkpoint_exit_code      = 85
 transfer_checkpoint_files = checkpoints
 when_to_transfer_output   = ON_EXIT_OR_EVICT
+transfer_output_files     = checkpoints
 kill_sig                  = SIGTERM
 container_image           = osdf:///chtc/staging/<user>/<image>.sif
 request_gpus              = 1

@@ -127,7 +127,7 @@ Resumable checkpoints are distinct from **exported models** (best or final weigh
 - Ignore repeated signals after the first.
 - **Never exit 0 because of a signal.** HTCondor requeues anyway (measured), but the code should say what it means.
 - Set `kill_sig = SIGTERM` explicitly in submit files, so the signal the code handles is visible.
-- **Process tree:** HTCondor signals only the top process. `run.sh` must `exec` Python (or the launcher wrapper). A wrapper that has to do work after training must trap and handle the signal itself. Workers and DataLoader children need no handler of their own, but making DataLoader workers ignore SIGTERM in `worker_init_fn` stays as cheap insurance for other schedulers.
+- **Process tree:** HTCondor signals only the top process. Start the job with `shell = exec python3 ...` in the submit file (measured: Python receives the SIGTERM), or a `run.sh` that `exec`s Python (or the launcher wrapper). A wrapper that has to do work after training must trap and handle the signal itself. Workers and DataLoader children need no handler of their own, but making DataLoader workers ignore SIGTERM in `worker_init_fn` stays as cheap insurance for other schedulers.
 - **Distributed runs:** ranks must agree on when to stop. Use a cheap collective (`all_reduce` with `MAX` on a one-element tensor) each step or every few steps, so all ranks stop at the same step. A rank that stops alone deadlocks the others. The runtime limit goes through the same agreement.
 - **Launchers** (`torchrun`, `accelerate`, `deepspeed`, `mpirun`):
   - **Default: the version-independent stop-file wrapper** (`htcondor_ckpt/launch.py`). On SIGTERM it creates a stop file and does *not* forward the signal, so the launcher never starts its own kill timer. Workers treat the file like the signal. After the launcher exits, the wrapper exits 85 if the workers asked for a restart.
@@ -139,7 +139,7 @@ Resumable checkpoints are distinct from **exported models** (best or final weigh
 - On resume, pick the newest *complete* checkpoint. Ignore `.tmp` directories and anything missing `metadata.json`. If the newest fails to load, fall back to the previous one and warn loudly.
 - Keep the last N resumable checkpoints (configurable; default 2, and 1 in spool mode to keep transfers small) plus the best exported model.
 - Clean up stale `.tmp` directories on startup (a hard kill mid-save leaves them, as measured).
-- **Spool mode:** list **one directory** in `transfer_checkpoint_files` and create it before the first possible exit 85. A listed path that doesn't exist puts the job on hold.
+- **Spool mode:** list **one directory** in `transfer_checkpoint_files` and create it before the first possible exit 85. A listed path that doesn't exist puts the job on hold. Name the same directory in `transfer_output_files`: HTCondor's default output transfer brings back only new top-level files, never directories, so without it `ON_EXIT_OR_EVICT` uploads nothing useful at an eviction (seen in recipe 0's first vacate test).
 - **`/staging` mode:** write few, large files (many small files are 10–40× slower). Every README states the checkpoint footprint: size × checkpoints kept, plus one in progress, and the file count. If it exceeds the default quota (100 GB / 1,000 files), the README tells users to request a larger quota from CHTC.
 
 ### 5. Resuming
@@ -156,7 +156,7 @@ Storage modes, selected in config and in the submit file:
 
 | Mode | Submit lines | Where | Use for |
 |---|---|---|---|
-| **Spool** | `checkpoint_exit_code = 85`, `transfer_checkpoint_files = <dir>`, `when_to_transfer_output = ON_EXIT_OR_EVICT` | CHTC and OSPool | Recipes 0–1 (and 2 if the checkpoint stays ~1–2 GB) |
+| **Spool** | `checkpoint_exit_code = 85`, `transfer_checkpoint_files = <dir>`, `when_to_transfer_output = ON_EXIT_OR_EVICT`, `transfer_output_files = <dir>` | CHTC and OSPool | Recipes 0–1 (and 2 if the checkpoint stays ~1–2 GB) |
 | **Staging** | `checkpoint_exit_code = 85`, checkpoint dir under `/staging/<user>/...` passed as an argument, `requirements = HasCHTCStaging =?= true` | CHTC only | Recipes 2–3, large checkpoints |
 
 - **Not recommended:** `checkpoint_destination`. `file://` fails and holds the job. `osdf://` works but restores slowly, and no SIGTERM save through it has been tested.
