@@ -87,6 +87,9 @@ Possible explanation for P3c: a job's `job_max_vacate_time` above `MachineMaxVac
 | `checkpoint_destination = file:///staging/...` | **fails**: upload hangs ~17 min, then "Starter failed to upload checkpoint" (code 36), hold | – | CHTC | P6b, `rest-chtc` |
 
 Other durability facts:
+- **Mid-save evictions (manual):** the HTCondor manual warns that an eviction "can happen at any time, including while the code is updating its checkpoint file(s)", and that with eviction transfers a half-written file can overwrite the previous complete one. Writing to a temporary name and renaming (what recipe 0 and `CheckpointStore` do) means a transfer only ever contains complete checkpoints, plus at most a `.tmp` leftover.
+- **`condor_evicted_files get <job>`** (after vacate + hold) copies the files HTCondor kept into `<job>/`. For recipe 0 it returned exactly `checkpoints/checkpoint.pt` from the eviction-time transfer: the save made after SIGTERM, which the released job resumed from. (recipe 0 `test_htcondor.sh inspect`, CHTC, 2026-10-06)
+- **`condor_ssh_to_job`** is turned off for GPU jobs on CHTC (policy); it works for CPU jobs.
 - **Exit 0 in response to a vacate does not complete the job.** HTCondor ignores the exit code during a vacate and requeues. (P2c)
 - **No SIGTERM handler at all:** the process dies at once and restarts from A. (P2d)
 - **A path listed in `transfer_checkpoint_files` that doesn't exist** on exit 85 puts the job on hold at once ("Starter failed to upload checkpoint", code 36). List one directory that always exists. (P8a)

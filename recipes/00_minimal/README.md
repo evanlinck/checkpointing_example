@@ -130,9 +130,31 @@ The resumed run matches the uninterrupted one **bit for bit** at every step. Tha
 ./test_htcondor.sh job_chtc.sub hold      # hold + release: same
 ./test_htcondor.sh job_chtc.sub fast      # hard kill: resumes from the last timed checkpoint
 ./test_htcondor.sh job_ospool.sub timed   # timed checkpoints only
+./test_htcondor.sh job_chtc.sub inspect    # copy out the kept checkpoint with condor_evicted_files
 ```
 
 Each prints the job's `SAVED` / `RESUMED` lines and a PASS or FAIL. The script reads only the job's event log, so it doesn't load the scheduler.
+
+## Inspecting your checkpoint
+
+When a resume doesn't do what you expect, look at the checkpoint HTCondor actually kept. This is the workflow from the HTCondor manual ("Debugging Self-Checkpointing Jobs"):
+
+```
+condor_vacate_job <job>            # evict the job: it saves and exits 85
+condor_hold <job>                  # right away, so it can't restart and overwrite what was kept
+condor_evicted_files get <job>     # copies the kept files into a subdirectory named <job>/
+condor_release <job>               # let the job continue
+```
+
+On CHTC, for this recipe, `condor_evicted_files` returned exactly `<job>/checkpoints/checkpoint.pt`: the save made after SIGTERM, which the released job then resumed from. To see what's inside, load it where PyTorch is available (e.g. in an interactive job with the same container):
+
+```
+python3 -c "import torch; s = torch.load('<job>/checkpoints/checkpoint.pt', weights_only=False); print('step', s['step'], 'epoch', s['epoch'], 'batch', s['batch_index'], 'reason', s['reason'])"
+```
+
+`./test_htcondor.sh job_chtc.sub inspect` runs the whole workflow and checks the result.
+
+For a CPU job like this one, `condor_ssh_to_job <job>` also opens a shell inside the running job's directory. (On CHTC it is turned off for GPU jobs.)
 
 ## Adapting it to your job
 

@@ -32,7 +32,8 @@ From the measurements in [`docs/environment.md`](docs/environment.md):
 | [`docs/`](docs/) | Measured environment, recipe specifications, and (later) the guide |
 | [`probes/`](probes/) | Test jobs that measure HTCondor's checkpoint behavior. Maintainer tooling; rerun when the pool changes |
 | [`results/`](results/) | Summaries of the probe runs cited by `docs/environment.md` |
-| `htcondor_ckpt/` | *(coming)* Shared checkpointing code, written to become an installable package later |
+| [`htcondor_ckpt/`](htcondor_ckpt/) | Shared checkpointing code (stop policy, atomic checkpoint store, metadata, PyTorch helpers, launcher wrapper), written to become an installable package later |
+| [`tests/`](tests/) | Unit tests for `htcondor_ckpt/` (`python -m pytest tests`) |
 | [`examples/`](examples/) | Copyable starter files: a minimal training script and submit files (more to come) |
 | [`recipes/`](recipes/) | The recipes (recipe 0 so far) |
 | [`CLAUDE.md`](CLAUDE.md) | Design contract and working notes used when building the recipes with Claude Code |

@@ -20,6 +20,8 @@ job.err
 test_*_[0-9]*.log
 test_*_[0-9]*.out
 test_*_[0-9]*.err
+test_*_[0-9]*.evicted/
+test_*_[0-9]*.evicted.txt
 *.sif
 
 # Probe results: keep the human-readable summaries (cited by docs/environment.md);
