@@ -72,6 +72,7 @@ recipes/
 - **Recipes get the modules** through `transfer_input_files` (or a copy inside the recipe directory, generated from `htcondor_ckpt/`, never edited by hand). Each recipe README says which modules it uses.
 - **Readable:** the core stays short enough to read in one sitting (aim for under ~600 lines). It supports Python 3.9+, so it also runs on bare CHTC execute points.
 - **`classad`:** an *optional* import in `vacate_budget()`, to evaluate the machine and job ads, with a plain-arithmetic fallback.
+- **Planned for later: `condor_chirp` support.** An optional module (e.g. `htcondor_ckpt/chirp.py`) that is skipped cleanly when chirp isn't available. Its use is low-frequency progress reporting: set job attributes like `LastCheckpointStep` / `LastCheckpointReason` once per checkpoint, never per step (updates go through the access point). Never use it to move checkpoints; that's what spool or `/staging` are for (the HTCondor manual also advises against such "manual transfers"). Build it only after a probe confirms chirp works inside a container (via the `htcondor` Python bindings or `htchirp`) on CHTC and the OSPool; P0 found the `condor_chirp` binary on the host but not in a plain Python container.
 - **Keep a short list of what we learn** that would change the package's API (`htcondor_ckpt/NOTES.md`), for when we package it.
 - **`probes/` is maintainer tooling** for measuring the pool. It is never part of `htcondor_ckpt/`, `examples/` or the recipes, and nothing outside `probes/` imports from it.
 
@@ -215,3 +216,6 @@ Each recipe must pass:
    - **Graceful shutdown with launchers:** version-independent first.
    - **Plugging the core into other frameworks:** Lightning, Hugging Face Trainer, JAX/Orbax, Keras.
    - **Sizing and requesting `/staging` quota.**
+   - **`condor_chirp`:** what it is, when it helps (progress visible in `condor_q`), and when not to use it.
+   - **Debugging a checkpoint:** vacate → hold → `condor_evicted_files get` → inspect → release (from the manual). `condor_ssh_to_job` for CPU jobs only; it's off for GPU jobs on CHTC.
+   - **Patterns from the manual we don't use, and why:** periodic checkpoint signals (`+WantCheckpointSignal`; the interval is set by the pool, not the job); "delayed transfers" (`ON_EXIT_OR_EVICT` *without* `checkpoint_exit_code`, which recovers only from evictions); "early checkpoint exits" with `OnExitRemove` (for short-runtime pools).

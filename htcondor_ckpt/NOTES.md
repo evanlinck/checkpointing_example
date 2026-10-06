@@ -22,5 +22,5 @@ Things we've learned, or still need to learn, that could change the interface. A
 
 ## Later
 
-- **`condor_chirp` support:** an optional `chirp.py` for low-frequency progress reporting, e.g. setting `LastCheckpointStep` once per checkpoint. First test whether chirp works inside a container via the `htcondor` Python bindings or `htchirp`, on CHTC and the OSPool. See CLAUDE.md.
+- **`condor_chirp` support** (progress reporting only; the HTCondor manual advises against using chirp to move checkpoints): an optional `chirp.py` for low-frequency progress reporting, e.g. setting `LastCheckpointStep` once per checkpoint. First test whether chirp works inside a container via the `htcondor` Python bindings or `htchirp`, on CHTC and the OSPool. See CLAUDE.md.
 - **Packaging:** a `pyproject.toml`, an `examples` command to copy starter files, and a version number.
