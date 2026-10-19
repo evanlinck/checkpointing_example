@@ -6,9 +6,10 @@
 # from the remote site ending the pilot ("glidein") the job runs in, often with
 # no SIGTERM at all. So the timed checkpoint is what protects your work here:
 # keep --max-runtime-seconds short enough that losing one interval is acceptable.
+# CHTC usually suggests 4–6 hours on the OSPool (up to 8); 5 hours here.
 # See job_chtc.sub for what each line does.
 
-shell                     = exec python3 train.py --max-runtime-seconds 3600 --step-delay 0.1
+shell                     = exec python3 train.py --max-runtime-seconds 18000 --step-delay 0.1
 transfer_input_files      = train.py
 
 checkpoint_exit_code      = 85

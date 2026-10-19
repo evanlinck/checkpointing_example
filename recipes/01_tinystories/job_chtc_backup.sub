@@ -1,0 +1,38 @@
+# Recipe 1 on CHTC GPUs: spool mode, plus backup copies on /staging that outlive the job.
+# Spool checkpoints are deleted when the job leaves the queue (condor_rm, a removal policy,
+# resubmitting). Backups let a resubmitted job pick up where the old one was.
+# See job_chtc.sub for what each line does; only the differences are explained here.
+
+# backup_dir: named after the run (not the job id, which changes when you resubmit).
+# backup_every_hours: how often a timed checkpoint is also copied there. Guidance for
+# different run lengths is in README.md ("How often to back up").
+# `export HOME=$PWD`: the container is read-only, and torch.compile/Triton write caches
+# under $HOME, so point it at the job's own (writable) directory first.
+shell                     = export HOME=$PWD; exec python3 train.py --config config.yaml --resume auto --set max_runtime_seconds=21600 --set backup_dir=/staging/<user>/tinystories-run1/backups --set backup_every_hours=12
+transfer_input_files      = train.py, model.py, config.yaml, htcondor_ckpt, osdf:///chtc/staging/<user>/tinystories/train.bin, osdf:///chtc/staging/<user>/tinystories/val.bin
+
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = checkpoints, outputs
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+transfer_output_files     = checkpoints, outputs
+kill_sig                  = SIGTERM
+
+# The backups are written straight to /staging, so the job needs a machine that mounts it.
+requirements              = (HasCHTCStaging =?= true)
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe1.sif
+
+request_gpus              = 1
+# GPU memory (MB), not to be confused with request_memory (host RAM). This model at batch 64 x 512
+# runs out of memory on 11 GB GPUs (seen on an RTX 2080 Ti-class card); 20 GB leaves room.
+gpus_minimum_memory       = 20000
++WantGPULab               = true
++GPUJobLength             = "short"
++is_resumable             = true
+
+request_cpus              = 4
+request_memory            = 24GB
+request_disk              = 20GB
+log                       = job.log
+output                    = job.out
+error                     = job.err
+queue

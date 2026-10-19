@@ -48,7 +48,7 @@ Out of scope (pointer to recipe 1 in comments): W&B, best-model export, config h
 
 ## Behavior
 
-- Only the options something actually sets are command-line options: `--max-runtime-seconds` (default 3600; triggers the timed exit 85), plus `--epochs`, `--log-every` and `--step-delay` for the tests. Everything else (checkpoint directory, batch size, learning rate, seed) is a named constant at the top of `train.py`.
+- Only the options something actually sets are command-line options: `--max-runtime-seconds` (default 6 h; the submit files use 6 h on CHTC and 5 h on the OSPool; triggers the timed exit 85), plus `--epochs`, `--log-every` and `--step-delay` for the tests. Everything else (checkpoint directory, batch size, learning rate, seed) is a named constant at the top of `train.py`.
 - The checkpoint directory is `checkpoints/` in the sandbox (spool mode). It is created at startup, so it exists before any exit 85 (a missing listed path puts the job on hold).
 - Log one line per save: step, reason, seconds, bytes.
 - Log a "RESUMED from step X (reason)" line on resume.
@@ -57,7 +57,7 @@ Out of scope (pointer to recipe 1 in comments): W&B, best-model export, config h
 
 Both submit files, every line commented:
 ```
-shell                     = exec python3 train.py --max-runtime-seconds 3600
+shell                     = exec python3 train.py --max-runtime-seconds 21600
 transfer_input_files      = train.py
 checkpoint_exit_code      = 85
 transfer_checkpoint_files = checkpoints

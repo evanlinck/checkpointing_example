@@ -19,21 +19,21 @@ Job: `6586480.0`   Test dir: `/home/<user>/probes/runs/p7-rerun/chtc/P7e-torchru
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 56bbfb46 | 11:25:38.4 | e2607 | False | 0 | None (None) |  | [(5, 'voluntary', 20.199)] | none (killed?) |
-| 7e5ac25e | 11:25:38.4 | e2607 | True | 0 | None (None) |  | [(5, 'voluntary', 20.198)] | none (killed?) |
+| 56bbfb46 | 11:25:38.4 | <host-2> | False | 0 | None (None) |  | [(5, 'voluntary', 20.199)] | none (killed?) |
+| 7e5ac25e | 11:25:38.4 | <host-2> | True | 0 | None (None) |  | [(5, 'voluntary', 20.198)] | none (killed?) |
 
 ## HTCondor event log (AP clock)
 
 - 11:13:27.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc__P7e-torchrun-vacate"; JobBatchName = "probes.dag+6586475" ]
-- 11:14:32.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2588.chtc.wisc.edu&noUDP&sock=slot1_30_2071214_623a_118576>
+- 11:14:32.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=slot1_30_2071214_623a_118576>
 - 11:14:35.0 `040 file_transfer` Finished transferring input files 
-- 11:14:35.0 `021 remote_error` Error from starter on slot1_30@e2588.chtc.wisc.edu: — Failed to transfer files: FILETRANSFER:1:non-zero exit (1) from /usr/libexec/condor/stash_plugin. |Error: Pelican Client Error: Attempt #3: from osdf-uw-cache.svc.osg-htc.org:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no su
-- 11:14:36.0 `004 evicted` Job was evicted. Code 13 Subcode 256 — (0) CPU times; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; 0  -  Run Bytes Sent By Job; 0  -  Run Bytes Received By Job; Reason: Transfer input files failure at execution point slot1_30@e2588.chtc.wisc.edu using protocol osdf. Details: Pel
-- 11:14:36.0 `012 held` Job was held. — Transfer input files failure at execution point slot1_30@e2588.chtc.wisc.edu using protocol osdf. Details: Pelican Client Error: Attempt #3: from osdf-uw-cache.svc.osg-htc.org:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no s
+- 11:14:35.0 `021 remote_error` Error from starter on slot1_30@<host-1>: — Failed to transfer files: FILETRANSFER:1:non-zero exit (1) from /usr/libexec/condor/stash_plugin. |Error: Pelican Client Error: Attempt #3: from osdf-uw-cache.svc.osg-htc.org:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no su
+- 11:14:36.0 `004 evicted` Job was evicted. Code 13 Subcode 256 — (0) CPU times; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; 0  -  Run Bytes Sent By Job; 0  -  Run Bytes Received By Job; Reason: Transfer input files failure at execution point slot1_30@<host-1> using protocol osdf. Details: Pel
+- 11:14:36.0 `012 held` Job was held. — Transfer input files failure at execution point slot1_30@<host-1> using protocol osdf. Details: Pelican Client Error: Attempt #3: from osdf-uw-cache.svc.osg-htc.org:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no s
 - 11:24:42.0 `013 released` Job was released. — via condor_release (by user <user>)
-- 11:25:20.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2607.chtc.wisc.edu&noUDP&sock=slot1_82_2859674_c7f9_121328>
+- 11:25:20.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-2>&noUDP&sock=slot1_82_2859674_c7f9_121328>
 - 11:25:31.0 `040 file_transfer` Finished transferring input files 
-- 11:25:31.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_82@e2607.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_1232955/scratch"; Cpus = 2; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 4096
+- 11:25:31.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_82@<host-2>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_1232955/scratch"; Cpus = 2; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 4096
 - 11:26:04.0 `040 file_transfer` Started transferring output files 
 - 11:26:04.0 `040 file_transfer` Finished transferring output files 
 - 11:26:05.0 `005 terminated` Job terminated. — (1) Normal termination (return value 1); Usr 0 00:00:04, Sys 0 00:00:01  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:04, Sys 0 00:00:01  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 2101207  -  Run Bytes Sent By Job; 286357653 
@@ -49,10 +49,10 @@ ExitCode = 1
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = 1790958364
 JobCurrentStartTransferOutputDate = 1790958364
-LastHoldReason = Transfer input files failure at execution point slot1_30@e2588.chtc.wisc.edu using protocol osdf. Details: Pelican Client Error: Attempt #3: from osdf-uw-cache.svc.osg-htc.org:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no such file or directory: server returned 404 Not Found (0s elapsed, 300ms since start); Attempt #2: from dtn-pas.kans.nrp.internet2.edu:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no such file or directory: server returned 404 Not Found (0s elapsed, 200ms since start); Attempt #1: from dtn-pas.cinc.nrp.internet2.edu:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no such file or directory: server returned 404 Not Found (100ms since start) (Version: 7.27.0-rc.5) ( URL file = osdf:///chtc/staging/<user>/ckpt-probes/images/pytorch.sif )|
+LastHoldReason = Transfer input files failure at execution point slot1_30@<host-1> using protocol osdf. Details: Pelican Client Error: Attempt #3: from osdf-uw-cache.svc.osg-htc.org:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no such file or directory: server returned 404 Not Found (0s elapsed, 300ms since start); Attempt #2: from dtn-pas.kans.nrp.internet2.edu:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no such file or directory: server returned 404 Not Found (0s elapsed, 200ms since start); Attempt #1: from dtn-pas.cinc.nrp.internet2.edu:8443: Specification.FileNotFound Error: Error code 5011: request failed (HTTP status 404): Unable to open (...Path...); no such file or directory: server returned 404 Not Found (100ms since start) (Version: 7.27.0-rc.5) ( URL file = osdf:///chtc/staging/<user>/ckpt-probes/images/pytorch.sif )|
 LastHoldReasonCode = 13
 LastHoldReasonSubCode = 256
-LastRemoteHost = slot1_82@e2607.chtc.wisc.edu
+LastRemoteHost = slot1_82@<host-2>
 LastRemoteWallClockTime = 45.0
 LastVacateTime = 1790957675
 NumCkpts = 0

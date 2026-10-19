@@ -1,0 +1,33 @@
+# Recipe 1 on CHTC GPUs, /staging mode: checkpoints are written straight to /staging.
+# Every save is safe the moment it's written (no transfer needed), so in-place saves every
+# 15 minutes are worthwhile, and 2 checkpoints are kept as a fallback.
+# See job_chtc.sub for what each line does; only the differences are explained here.
+
+# The data is read straight from /staging too, so nothing big is transferred.
+# `export HOME=$PWD`: the container is read-only, and torch.compile/Triton write caches
+# under $HOME, so point it at the job's own (writable) directory first.
+shell                     = export HOME=$PWD; exec python3 train.py --config config.yaml --resume auto --set max_runtime_seconds=21600 --set data_dir=/staging/<user>/tinystories --set ckpt_dir=/staging/<user>/tinystories-run1/checkpoints --set out_dir=/staging/<user>/tinystories-run1/outputs --set keep_checkpoints=2 --set save_every_minutes=15
+transfer_input_files      = train.py, model.py, config.yaml, htcondor_ckpt
+
+# Exit 85 still means "restart me". No transfer lines: HTCondor doesn't handle the checkpoints.
+checkpoint_exit_code      = 85
+kill_sig                  = SIGTERM
+
+requirements              = (HasCHTCStaging =?= true)
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe1.sif
+
+request_gpus              = 1
+# GPU memory (MB), not to be confused with request_memory (host RAM). This model at batch 64 x 512
+# runs out of memory on 11 GB GPUs (seen on an RTX 2080 Ti-class card); 20 GB leaves room.
+gpus_minimum_memory       = 20000
++WantGPULab               = true
++GPUJobLength             = "short"
++is_resumable             = true
+
+request_cpus              = 4
+request_memory            = 24GB
+request_disk              = 10GB
+log                       = job.log
+output                    = job.out
+error                     = job.err
+queue

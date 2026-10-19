@@ -84,7 +84,7 @@ recipes/
 
 Each works on its own when copied into a user's project. The files use `# ===== CHECKPOINT: <name> =====` banners.
 
-Each recipe directory contains: `prepare_data.py` (except recipe 0), `train.py`, `config.yaml`, `run.sh`, submit files, `requirements.txt` (or the container definition), and a user-facing `README.md`.
+Each recipe directory contains: `prepare_data.py` (except recipe 0), `train.py`, `config.yaml`, submit files (starting the job with `shell = exec python3 ...`, or a `run.sh` that `exec`s), `requirements.txt` and `container.def`, local and HTCondor test scripts, and a user-facing `README.md`.
 
 ## The checkpointing contract
 
@@ -109,7 +109,7 @@ PyTorch specifics:
 
 The job exits with **85** ("state saved, restart me") on two equal, first-class triggers, through one code path (`should_stop()` → save → exit 85):
 
-- **Timed exit** (`max_runtime_seconds`, default ~1 h; the HTCondor manual's suggestion). This is CHTC's documented pattern. It is cheap, because the restart is usually in place. It is also the only protection against hard kills and OSPool glidein ends. In spool mode it is also *the* periodic checkpoint: a save that stays in scratch is lost on a hard kill.
+- **Timed exit** (`max_runtime_seconds`). Defaults follow CHTC's guidance, not the HTCondor manual's generic "about once an hour": **4–6 h on the OSPool (up to 8)** and **6–10 h on CHTC backfill**. A vacate with SIGTERM gets its own save, so the timed interval only bounds what a hard kill can take; weigh it against the cost of one timed checkpoint (save + transfer + restart/restore). This is CHTC's documented pattern. It is cheap, because the restart is usually in place. It is also the only protection against hard kills and OSPool glidein ends. In spool mode it is also *the* periodic checkpoint: a save that stays in scratch is lost on a hard kill.
 - **Eviction** (SIGTERM from a vacate, a hold, backfill preemption, or reaching the GPU runtime limit with `+is_resumable`). See section 3.
 
 Also:
@@ -141,6 +141,7 @@ Resumable checkpoints are distinct from **exported models** (best or final weigh
 - Keep the last N resumable checkpoints (configurable; default 2, and 1 in spool mode to keep transfers small) plus the best exported model.
 - Clean up stale `.tmp` directories on startup (a hard kill mid-save leaves them, as measured).
 - **Spool mode:** list **one directory** in `transfer_checkpoint_files` and create it before the first possible exit 85. A listed path that doesn't exist puts the job on hold. Name the same directory in `transfer_output_files`: HTCondor's default output transfer brings back only new top-level files, never directories, so without it `ON_EXIT_OR_EVICT` uploads nothing useful at an eviction (seen in recipe 0's first vacate test).
+- **Backups that outlive the job (spool + `/staging`):** spool checkpoints are deleted when the job leaves the queue (`condor_rm`, removal policies, resubmitting). At timed checkpoints, when `backup_due()`, copy the checkpoint to `/staging/<user>/<run_name>/backups` (`store.backup()`, keep 2). At startup, resume from the newest across both stores (`store.load_newest()`). Name the folder after the run, never the job id. Never back up in the SIGTERM path. Backups only happen at timed checkpoints. Frequency guidance (in `htcondor_ckpt/README.md`): none for runs that fit in one or two timed intervals; at every timed checkpoint for runs up to about a day; about every 12 h for 1–3 days; every 12–24 h for longer runs.
 - **`/staging` mode:** write few, large files (many small files are 10–40× slower). Every README states the checkpoint footprint: size × checkpoints kept, plus one in progress, and the file count. If it exceeds the default quota (100 GB / 1,000 files), the README tells users to request a larger quota from CHTC.
 
 ### 5. Resuming
@@ -185,6 +186,7 @@ Each recipe must pass:
 - **A local signal test:** start a short run, send `kill -TERM` at a random step, confirm it saves and exits 85, then resume and finish.
 - **A resume-equivalence test:** run N steps uninterrupted, then the same N steps with several interruptions and resumes, and compare loss curves. With deterministic settings they should match within a small tolerance. Document the tolerance and why exact bitwise equality may not hold (nondeterministic CUDA kernels). The overlaid plot is a key teaching artifact; include it in each README.
 - **Save time and checkpoint footprint at full scale,** recorded in the README and compared against the 600 s budget and the `/staging` quota.
+- **The cost of one timed checkpoint**, broken down into save time, transfer time (the event log's file-transfer events) and restart/restore time (container start, data loading, imports, `torch.compile`, launcher start-up). Report it as a percentage of the chosen interval and next to the job's total length.
 - **HTCondor tests on the recipe's target pools:**
   - a timed exit 85;
   - `condor_vacate_job`;
@@ -216,6 +218,7 @@ Each recipe must pass:
    - **Graceful shutdown with launchers:** version-independent first.
    - **Plugging the core into other frameworks:** Lightning, Hugging Face Trainer, JAX/Orbax, Keras.
    - **Sizing and requesting `/staging` quota.**
+   - **Backups that outlive the job, and how often to make them** (the table in `htcondor_ckpt/README.md`).
    - **`condor_chirp`:** what it is, when it helps (progress visible in `condor_q`), and when not to use it.
    - **Debugging a checkpoint:** vacate → hold → `condor_evicted_files get` → inspect → release (from the manual). `condor_ssh_to_job` for CPU jobs only; it's off for GPU jobs on CHTC.
    - **Patterns from the manual we don't use, and why:** periodic checkpoint signals (`+WantCheckpointSignal`; the interval is set by the pool, not the job); "delayed transfers" (`ON_EXIT_OR_EVICT` *without* `checkpoint_exit_code`, which recovers only from evictions); "early checkpoint exits" with `OnExitRemove` (for short-runtime pools).

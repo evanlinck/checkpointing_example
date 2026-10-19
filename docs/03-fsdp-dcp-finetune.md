@@ -44,7 +44,7 @@ Write a short calculation in the README: 8B parameters × (bf16 weights + fp32 m
 - RNG states and other small per-rank state: save alongside (a per-rank file, or included in the stateful object). Explain the choice.
 - Atomicity: DCP writes many files. Keep the same contract as the other recipes: write into a `.tmp` directory, have all ranks finish (barrier), then rank 0 writes `metadata.json`, renames the directory and updates `latest`. Confirm DCP's own metadata file is present before treating a checkpoint as complete.
 - **Async save:** use `dcp.async_save` for periodic checkpoints. Only one async save may be in flight; wait for the previous one before starting another. On a stop request, wait for any in-flight save before deciding what to do next. Note in comments that async save stages a copy of state in CPU memory, and request enough job memory for it.
-- Periodic in-place saves: every 30 minutes (configurable). Timed exit: `max_runtime_seconds` default ~1 h, but weigh it against the measured restart cost (model load + FSDP setup); a longer interval may be justified here.
+- Periodic in-place saves: every 30 minutes (configurable). Timed exit: `max_runtime_seconds` default 6–10 h (CHTC's suggestion for backfill), weighed against the measured restart cost (model load + FSDP setup); a longer interval may be justified here.
 
 ### The time-budget decision (central lesson, part 2)
 

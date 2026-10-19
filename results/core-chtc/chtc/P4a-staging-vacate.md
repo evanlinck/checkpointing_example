@@ -20,22 +20,22 @@ Job: `6527348.0`   Test dir: `runs/core-chtc/chtc/P4a-staging-vacate`
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 0932f248 | 14:07:19.4 | e2016.chtc.wisc.edu | False | 0 | None (None) |  | [(30, 'periodic', 0.362), (60, 'voluntary', 0.55)] | 85 |
-| a1c3a1ae | 14:08:43.6 | e2016.chtc.wisc.edu | True | 0 | 60 (voluntary) | SIGTERM | [(90, 'periodic', 0.739), (112, 'signal', 0.308)] | 85 |
-| 180f598d | 14:11:17.6 | e2481 | False | 1 | 112 (signal) |  | [(120, 'periodic', 0.853), (150, 'periodic', 1.472), (180, 'periodic', 0.452), (210, 'periodic', 0.319), (240, 'periodic', 0.792), (270, 'periodic', 0.644), (300, 'periodic', 0.868), (330, 'periodic', 0.376), (360, 'periodic', 0.374), (390, 'periodic', 1.723), (420, 'periodic', 0.577), (420, 'final', 0.811)] | 0 |
+| 0932f248 | 14:07:19.4 | <host-1> | False | 0 | None (None) |  | [(30, 'periodic', 0.362), (60, 'voluntary', 0.55)] | 85 |
+| a1c3a1ae | 14:08:43.6 | <host-1> | True | 0 | 60 (voluntary) | SIGTERM | [(90, 'periodic', 0.739), (112, 'signal', 0.308)] | 85 |
+| 180f598d | 14:11:17.6 | <host-2> | False | 1 | 112 (signal) |  | [(120, 'periodic', 0.853), (150, 'periodic', 1.472), (180, 'periodic', 0.452), (210, 'periodic', 0.319), (240, 'periodic', 0.792), (270, 'periodic', 0.644), (300, 'periodic', 0.868), (330, 'periodic', 0.376), (360, 'periodic', 0.374), (390, 'periodic', 1.723), (420, 'periodic', 0.577), (420, 'final', 0.811)] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 14:06:32.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc__P4a-staging-vacate"; JobBatchName = "probes.dag+6527287" ]
-- 14:07:06.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2016.chtc.wisc.edu&noUDP&sock=slot1_25_3486004_ed36_76114>
+- 14:07:06.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=slot1_25_3486004_ed36_76114>
 - 14:07:16.0 `040 file_transfer` Finished transferring input files 
-- 14:07:18.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_25@e2016.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_4097410/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
+- 14:07:18.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_25@<host-1>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_4097410/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
 - 14:08:42.0 `040 file_transfer` Started transferring output files 
 - 14:08:42.0 `040 file_transfer` Finished transferring output files 
 - 14:09:55.0 `004 evicted` Job was evicted. Code 1022 Subcode 0 — (0) CPU times; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; 0  -  Run Bytes Sent By Job; 286336878  -  Run Bytes Received By Job; Reason: Job vacated by schedd; Cpus                 :                 1         1; Disk (KB)            :   27
-- 14:11:03.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2481.chtc.wisc.edu&noUDP&sock=slot1_39_3564670_3d75_92238>
+- 14:11:03.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-2>&noUDP&sock=slot1_39_3564670_3d75_92238>
 - 14:11:16.0 `040 file_transfer` Finished transferring input files 
-- 14:11:16.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_39@e2481.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_3456962/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
+- 14:11:16.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_39@<host-2>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_3456962/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
 - 14:18:25.0 `040 file_transfer` Started transferring output files 
 - 14:18:28.0 `040 file_transfer` Finished transferring output files 
 - 14:18:28.0 `005 terminated` Job terminated. — (1) Normal termination (return value 0); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 20002  -  Run Bytes Sent By Job; 286336886  -
@@ -52,7 +52,7 @@ ExitCode = 0
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = -1
 JobCurrentStartTransferOutputDate = 1790882305
-LastRemoteHost = slot1_39@e2481.chtc.wisc.edu
+LastRemoteHost = slot1_39@<host-2>
 LastRemoteWallClockTime = 446.0
 LastVacateTime = 1790881795
 NumCkpts = 0
@@ -92,7 +92,7 @@ WhenToTransferOutput = ON_EXIT
 14:08:42.4 0932f248 exit                   {"code": 85, "reason": "voluntary exit at step 60", "step": 60}
 14:08:43.6 a1c3a1ae start                  {"cwd": "/var/lib/condor/execute/slot1/dir_4097410/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 1, "python": "3.12.14", "sandbox_created_by": "0932f248", "sandbox_marker_survived": true, "scratch_dir": "/var/lib/condor/execute/slot1/dir_4097410/scratch"}
 14:08:43.6 a1c3a1ae history_attached       {"ckpt_dir": "/staging/<user>/ckpt-probes/runs/6527348.0/ckpt", "store": "staging"}
-14:08:43.7 a1c3a1ae restore                {"chosen": "step_00000060", "ckpt_dir": "/staging/<user>/ckpt-probes/runs/6527348.0/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000060", "nested_dir_ok": true, "saved_at": 1790881721.8725927, "saved_by_exec": "0932f248", "saved_on_host": "e2016.chtc.wisc.edu", "saved_reason": "
+14:08:43.7 a1c3a1ae restore                {"chosen": "step_00000060", "ckpt_dir": "/staging/<user>/ckpt-probes/runs/6527348.0/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000060", "nested_dir_ok": true, "saved_at": 1790881721.8725927, "saved_by_exec": "0932f248", "saved_on_host": "<host-1>", "saved_reason": "
 14:08:43.7 a1c3a1ae loop_start             {"restored_step": 60, "step": 60, "total_steps": 420, "voluntary_exit_at": [60]}
 14:09:25.5 a1c3a1ae save_start             {"ckpt_files": 1, "ckpt_mb": 1, "reason": "periodic", "step": 90}
 14:09:26.3 a1c3a1ae save_done              {"bytes": 1048576, "dir_fsync_ok": true, "reason": "periodic", "seconds": 0.739, "step": 90, "write_seconds": 0.359}
@@ -104,7 +104,7 @@ WhenToTransferOutput = ON_EXIT
 14:09:55.8 a1c3a1ae exit                   {"code": 85, "reason": "signal SIGTERM, on_sigterm=save85", "step": 112}
 14:11:17.6 180f598d start                  {"cwd": "/var/lib/condor/execute/slot1/dir_3456962/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 0, "python": "3.12.14", "sandbox_created_by": "180f598d", "sandbox_marker_survived": false, "scratch_dir": "/var/lib/condor/execute/slot1/dir_3456962/scratch"}
 14:11:18.2 180f598d history_attached       {"ckpt_dir": "/staging/<user>/ckpt-probes/runs/6527348.0/ckpt", "store": "staging"}
-14:11:18.8 180f598d restore                {"chosen": "step_00000112", "ckpt_dir": "/staging/<user>/ckpt-probes/runs/6527348.0/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000112", "nested_dir_ok": true, "saved_at": 1790881795.581727, "saved_by_exec": "a1c3a1ae", "saved_on_host": "e2016.chtc.wisc.edu", "saved_reason": "s
+14:11:18.8 180f598d restore                {"chosen": "step_00000112", "ckpt_dir": "/staging/<user>/ckpt-probes/runs/6527348.0/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000112", "nested_dir_ok": true, "saved_at": 1790881795.581727, "saved_by_exec": "a1c3a1ae", "saved_on_host": "<host-1>", "saved_reason": "s
 14:11:18.8 180f598d loop_start             {"restored_step": 112, "step": 112, "total_steps": 420, "voluntary_exit_at": [60]}
 14:11:30.0 180f598d save_start             {"ckpt_files": 1, "ckpt_mb": 1, "reason": "periodic", "step": 120}
 14:11:31.8 180f598d save_done              {"bytes": 1048576, "dir_fsync_ok": true, "reason": "periodic", "seconds": 0.853, "step": 120, "write_seconds": 0.716}

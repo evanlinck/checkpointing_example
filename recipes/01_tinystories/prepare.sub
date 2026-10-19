@@ -1,0 +1,19 @@
+# Tokenize TinyStories once (a CPU job), writing train.bin / val.bin straight to /staging.
+# Submit with:  condor_submit prepare.sub      (first replace the <...> placeholders)
+
+# HF_HOME: keep the downloaded dataset in the job's own directory, not in your home.
+# `export HOME=$PWD`: the container is read-only, and torch.compile/Triton write caches
+# under $HOME, so point it at the job's own (writable) directory first.
+shell                     = export HOME=$PWD; exec python3 prepare_data.py --out-dir /staging/<user>/tinystories
+environment               = "HF_HOME=hf_cache"
+transfer_input_files      = prepare_data.py
+requirements              = (HasCHTCStaging =?= true)
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe1.sif
+
+request_cpus              = 8
+request_memory            = 16GB
+request_disk              = 30GB
+log                       = prepare.log
+output                    = prepare.out
+error                     = prepare.err
+queue

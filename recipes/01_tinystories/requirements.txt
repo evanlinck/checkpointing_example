@@ -1,0 +1,10 @@
+# Recipe 1's Python packages, on top of PyTorch 2.8.0 (which comes with the container's base
+# image, so it is not listed here: installing it again would replace the image's CUDA build).
+# numpy and pyyaml are the versions the local tests ran with (Python 3.9 and 3.12).
+# tiktoken and datasets are the newest releases from before the container was built (2026-10-14),
+# which is what that build installed. To check your own image:
+#   apptainer exec recipe1.sif pip freeze | grep -iE "tiktoken|datasets"
+numpy==2.0.2
+pyyaml==6.0.3
+tiktoken==0.14.0  # GPT-2 tokenizer: prepare_data.py, and the sample stories in train.py
+datasets==5.1.0   # only for prepare_data.py (downloads TinyStories); needs Python 3.10+

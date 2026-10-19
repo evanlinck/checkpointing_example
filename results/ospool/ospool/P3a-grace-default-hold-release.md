@@ -19,16 +19,16 @@ Job: `6589088.0`   Test dir: `/home/<user>/probes/runs/ospool/ospool/P3a-grace-d
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 6e2679ad | 11:43:50.1 | gpu-node007 | False | 0 | None (None) |  | [(5, 'voluntary', 0.006)] | 85 |
-| 511a13be | 11:43:56.5 | gpu-node007 | True | 0 | 5 (voluntary) | SIGTERM | [] | none (killed?) |
+| 6e2679ad | 11:43:50.1 | <host-1> | False | 0 | None (None) |  | [(5, 'voluntary', 0.006)] | 85 |
+| 511a13be | 11:43:56.5 | <host-1> | True | 0 | 5 (voluntary) | SIGTERM | [] | none (killed?) |
 
 ## HTCondor event log (AP clock)
 
 - 11:43:40.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "ospool__P3a-grace-default-hold-release"; JobBatchName = "probes.dag+6586482" ]
 - 11:43:43.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:34269?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[<ipv6>]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector1#14602210%2067.58.49.91:9618%3faddrs%3d67.58.49.91-9618+[<ipv6>]-9618%26al
 - 11:43:47.0 `040 file_transfer` Finished transferring input files 
-- 11:43:49.0 `021 remote_error` Message from starter on slot1_2@glidein_274178_123184125@gpu-node007: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
-- 11:43:49.0 `001 executing` Job executing on host: <<ip>:44119?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_2@glidein_274178_123184125@gpu-node007; AvailableGPUs = {  }; CondorScratchDir = "/local/scratch/glide_7p1DYF/execute/dir_1971139/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
+- 11:43:49.0 `021 remote_error` Message from starter on slot1_2@glidein_274178_123184125@<host-1>: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
+- 11:43:49.0 `001 executing` Job executing on host: <<ip>:44119?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_2@glidein_274178_123184125@<host-1>; AvailableGPUs = {  }; CondorScratchDir = "/local/scratch/glide_7p1DYF/execute/dir_1971139/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
 - 11:43:55.0 `040 file_transfer` Started transferring output files 
 - 11:43:55.0 `040 file_transfer` Finished transferring output files 
 - 11:55:23.0 `004 evicted` Job was evicted. Code 1 Subcode 0 — (0) CPU times; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; 1051212  -  Run Bytes Sent By Job; 286336878  -  Run Bytes Received By Job; Reason: via condor_hold (by user <user>); Cpus                 :      0.00        1         1; Disk (KB)
@@ -52,7 +52,7 @@ JobCurrentStartTransferOutputDate = 1790959435
 LastHoldReason = via condor_hold (by user <user>)
 LastHoldReasonCode = 1
 LastHoldReasonSubCode = 0
-LastRemoteHost = slot1_2@glidein_274178_123184125@gpu-node007
+LastRemoteHost = slot1_2@glidein_274178_123184125@<host-1>
 LastRemoteWallClockTime = 701.0
 LastVacateTime = 1790960123
 NumCkpts = 0
@@ -96,7 +96,7 @@ WhenToTransferOutput = ON_EXIT
 11:43:55.1 6e2679ad exit                   {"code": 85, "reason": "voluntary exit at step 5", "step": 5}
 11:43:56.5 511a13be start                  {"cwd": "/srv/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 1, "python": "3.12.14", "sandbox_created_by": "6e2679ad", "sandbox_marker_survived": true, "scratch_dir": "/srv/scratch"}
 11:43:56.5 511a13be history_attached       {"ckpt_dir": "/srv/scratch/ckpt", "store": "spool"}
-11:43:56.5 511a13be restore                {"chosen": "step_00000005", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790959435.1209946, "saved_by_exec": "6e2679ad", "saved_on_host": "gpu-node007", "saved_reason": "voluntary", "step": 5}
+11:43:56.5 511a13be restore                {"chosen": "step_00000005", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790959435.1209946, "saved_by_exec": "6e2679ad", "saved_on_host": "<host-1>", "saved_reason": "voluntary", "step": 5}
 11:43:56.5 511a13be loop_start             {"restored_step": 5, "step": 5, "total_steps": 3000, "voluntary_exit_at": [5]}
 11:45:22.5 511a13be signal                 {"first": true, "on_sigterm": "ignore", "received_at": 1790959522.4414072, "role": "parent", "signal": "SIGTERM", "step": 90}
 ```

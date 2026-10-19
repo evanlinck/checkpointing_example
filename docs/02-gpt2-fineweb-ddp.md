@@ -42,7 +42,7 @@ At 10B tokens the natural unit is tokens or steps, and a single pass over the da
 - All ranks load the checkpoint (mapped to their own device). Use `dist.barrier()` around save and load where needed, and comment why.
 - Checkpoint size will be roughly 1.5 GB (fp32 weights + two AdamW moments). Measure save time and size.
 - **Storage:** `/staging` mode is the default (in-place periodic saves every 30 min are durable at once). Spool mode is a documented alternative: a 1 GB checkpoint added only ~5 s to an exit-85 restart, and `ON_EXIT_OR_EVICT` keeps the save made after SIGTERM. Measure it, and state when spool stops being reasonable.
-- **Timed exit:** `max_runtime_seconds` default ~1 h, through the same rank agreement as the stop flag.
+- **Timed exit:** `max_runtime_seconds` default 6 h (CHTC suggests 6–10 h on backfill), through the same rank agreement as the stop flag. Report the measured cost of one timed checkpoint (save + restart, incl. ~18 s of `torchrun` start-up and `torch.compile`) against the interval.
 - **Stop agreement:** `htcondor_ckpt/torch_utils.py` provides a helper that all-reduces the local stop flag (`MAX`) every K steps (configurable, default every step; negligible next to a 0.5M-token step). The flag comes from the signal *or* the stop file. Whichever rank sees it first makes all ranks stop at the same step.
 - **Restart cost:** each `torchrun` (re)start took ~18 s before workers ran (measured with CPU torch). Measure the real cost with CUDA initialization and `torch.compile`, and use it to justify the timed-exit interval.
 

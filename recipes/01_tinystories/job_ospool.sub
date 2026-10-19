@@ -1,0 +1,33 @@
+# Recipe 1 on the OSPool (submitted from a CHTC access point), spool mode.
+# On the OSPool, interruptions usually come from the remote site ending the job's pilot,
+# often without a SIGTERM, so the timed checkpoint is what protects your work: 5 hours here
+# (CHTC usually suggests 4-6 hours on the OSPool, up to 8).
+# See job_chtc.sub for what each line does; only the differences are explained here.
+
+# `export HOME=$PWD`: the container is read-only, and torch.compile/Triton write caches
+# under $HOME, so point it at the job's own (writable) directory first.
+shell                     = export HOME=$PWD; exec python3 train.py --config config.yaml --resume auto --set max_runtime_seconds=18000
+transfer_input_files      = train.py, model.py, config.yaml, htcondor_ckpt, osdf:///chtc/staging/<user>/tinystories/train.bin, osdf:///chtc/staging/<user>/tinystories/val.bin
+
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = checkpoints, outputs
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+transfer_output_files     = checkpoints, outputs
+kill_sig                  = SIGTERM
+
+# Send the job to the OSPool. OSPool machines can't see /staging, but can fetch through OSDF.
+want_ospool               = true
+requirements              = (Poolname =!= "CHTC")
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe1.sif
+
+request_gpus              = 1
+# GPU memory (MB), not to be confused with request_memory (host RAM). This model at batch 64 x 512
+# runs out of memory on 11 GB GPUs (seen on an RTX 2080 Ti-class card); 20 GB leaves room.
+gpus_minimum_memory       = 20000
+request_cpus              = 4
+request_memory            = 24GB
+request_disk              = 20GB
+log                       = job.log
+output                    = job.out
+error                     = job.err
+queue

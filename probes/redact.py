@@ -7,6 +7,10 @@ Replaces:
   - /home/<name> and /staging/<x>/<name> or /staging/<name> paths
   - osdf:///chtc/staging/... paths
   - IPv4 and IPv6 addresses (event-log "Job executing on host: <...>" lines)
+  - execute machine names (many CHTC GPU machines are named after their owners; OSPool
+    worker nodes name the site). Each becomes <host-1>, <host-2>, ... numbered per file, so
+    a report still shows whether a job restarted on the same machine or a different one.
+    The access point's name (ap2002 etc.) is kept.
 
 analyze.py applies this to every report it writes. To clean existing reports in place:
     python3 redact.py results/            # all .md and .json files under results/
@@ -32,6 +36,39 @@ PATTERNS = [
 ]
 
 
+# Where machine names appear in reports: the alias in sinful strings, SlotName and
+# LastRemoteHost (slot@host, glidein_..@host), and the probes' own "saved_on_host".
+HOST_SOURCES = [
+    re.compile(r"alias=([A-Za-z0-9][A-Za-z0-9.-]*)"),
+    # the last @-part of a slot name. A glidein name (glidein_123_456@host) has underscores, which
+    # host names never have, so the lookahead skips it.
+    re.compile(r"@([A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*)(?![A-Za-z0-9_@-])"),
+    re.compile(r'"saved_on_host": "([^"]+)"'),
+]
+KEEP_HOST = re.compile(r"^(ap\d+|submit-?\d*)(\.|$)")   # access points are public; keep them
+
+
+def redact_hosts(text):
+    """Replace every execute machine name found in text with <host-N>: the full name and
+    its first label (tables often show only that), in order of first appearance."""
+    names = []
+    for pat in HOST_SOURCES:
+        for m in pat.finditer(text):
+            full = m.group(1).rstrip(".")
+            if len(full) >= 4 and not KEEP_HOST.match(full) and not full.startswith("<"):
+                if full not in names:
+                    names.append(full)
+    labels, numbers = {}, {}   # name -> placeholder; short name -> number
+    for full in sorted(names, key=lambda n: text.find(n)):
+        short = full.split(".")[0]
+        n = numbers.setdefault(short, len(numbers) + 1)
+        labels[full] = labels[short] = "<host-%d>" % n
+    for name in sorted(labels, key=len, reverse=True):   # longest first: full names before labels
+        if len(name) >= 4:
+            text = re.sub(r"(?<![A-Za-z0-9-])%s(?![A-Za-z0-9-])" % re.escape(name), labels[name], text)
+    return text
+
+
 def default_user():
     for var in ("PROBE_USER", "USER", "LOGNAME"):
         if os.environ.get(var):
@@ -45,6 +82,7 @@ def default_user():
 def redact(text, user=None):
     for pat, repl in PATTERNS:
         text = pat.sub(repl, text)
+    text = redact_hosts(text)
     user = user if user is not None else default_user()
     if user and len(user) >= 3:
         text = re.sub(r"\b%s\b" % re.escape(user), "<user>", text)

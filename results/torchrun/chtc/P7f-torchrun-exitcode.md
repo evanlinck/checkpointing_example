@@ -19,15 +19,15 @@ Job: `6590838.0`   Test dir: `/home/<user>/probes/runs/torchrun/chtc/P7f-torchru
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 83845500 | 12:33:26.2 | e2464.chtc.wisc.edu | False | 0 | None (None) |  | [(30, 'voluntary', 0.007)] | 85 |
-| 92959aa2 | 12:33:26.2 | e2464.chtc.wisc.edu | False | 0 | None (None) |  | [(30, 'voluntary', 0.006)] | 85 |
+| 83845500 | 12:33:26.2 | <host-1> | False | 0 | None (None) |  | [(30, 'voluntary', 0.007)] | 85 |
+| 92959aa2 | 12:33:26.2 | <host-1> | False | 0 | None (None) |  | [(30, 'voluntary', 0.006)] | 85 |
 
 ## HTCondor event log (AP clock)
 
 - 12:31:52.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc__P7f-torchrun-exitcode"; JobBatchName = "probes.dag+6590835" ]
-- 12:33:17.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2464.chtc.wisc.edu&noUDP&sock=slot1_1_1734380_5bf9_14429>
+- 12:33:17.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=slot1_1_1734380_5bf9_14429>
 - 12:33:23.0 `040 file_transfer` Finished transferring input files 
-- 12:33:23.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_1@e2464.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_3733957/scratch"; Cpus = 2; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 4096
+- 12:33:23.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_1@<host-1>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_3733957/scratch"; Cpus = 2; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 4096
 - 12:33:57.0 `040 file_transfer` Started transferring output files 
 - 12:33:57.0 `040 file_transfer` Finished transferring output files 
 - 12:33:57.0 `005 terminated` Job terminated. — (1) Normal termination (return value 1); Usr 0 00:00:02, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:02, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 2102201  -  Run Bytes Sent By Job; 286357878 
@@ -43,7 +43,7 @@ ExitCode = 1
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = 1790962437
 JobCurrentStartTransferOutputDate = 1790962437
-LastRemoteHost = slot1_1@e2464.chtc.wisc.edu
+LastRemoteHost = slot1_1@<host-1>
 LastRemoteWallClockTime = 40.0
 NumCkpts = 0
 NumCkpts_RAW = 0
@@ -79,7 +79,7 @@ probe.py FAILED
 Failures:
 [1]:
   time      : 2026-10-02_12:33:56
-  host      : e2464.chtc.wisc.edu
+  host      : <host-1>
   rank      : 1 (local_rank: 1)
   exitcode  : 85 (pid: 21)
   error_file: <N/A>
@@ -88,7 +88,7 @@ Failures:
 Root Cause (first observed failure):
 [0]:
   time      : 2026-10-02_12:33:56
-  host      : e2464.chtc.wisc.edu
+  host      : <host-1>
   rank      : 0 (local_rank: 0)
   exitcode  : 85 (pid: 20)
   error_file: <N/A>

@@ -8,6 +8,8 @@ Things we've learned, or still need to learn, that could change the interface. A
 - **`classad` evaluation.** The fallback only evaluates plain arithmetic (`10 * 60`). Not yet tested with the HTCondor Python bindings installed in a container. That test should happen together with the `condor_chirp` probe below.
 - **Sharded checkpoints (DCP/FSDP).** `CheckpointStore.save(write_fn)` assumes one process writes the directory. With DCP every rank writes into the same `.tmp` directory, and rank 0 must wait (barrier) before writing `metadata.json` and renaming. Likely a `save()` split into `begin()` / `commit()`, or a `distributed=True` mode. Decide with recipe 3.
 - **Async saves (recipe 3).** `StopPolicy.past_deadline()` exists for the "does a final save still fit?" decision. The policy itself (wait for the in-flight save / save / skip) isn't written yet.
+- **Backups on the OSPool.** There's no `/staging` there. A job would have to upload through OSDF itself, which is untested, and HTCondor-managed alternatives (`transfer_output_remaps` to an `osdf://` URL at eviction?) are unexplored. Until then, OSPool runs rely on spool only.
+- **Untested on HTCondor:** the backup helpers have unit tests only. Recipe 1's "condor_rm + resubmit" acceptance test will be their first real run.
 - **Where the shared code lives on the execute point.** For now recipes send the directory with `transfer_input_files`. A package would be installed in the container instead.
 
 ## Decisions so far
@@ -15,10 +17,12 @@ Things we've learned, or still need to learn, that could change the interface. A
 - **The modules don't import each other,** so any single file can be copied. The cost is a little duplication (`EXIT_RESTART` and the environment-variable names in both `stop.py` and `launch.py`).
 - **`StopPolicy` reads the stop and restart file paths from environment variables** set by `launch.py`. That way, training code needs no changes to run under the wrapper.
 - **`exit_for_restart()` always writes the restart file if one is configured,** even on a single GPU. That's harmless, and it keeps one code path.
+- **Backups are stateless:** `backup_due()` reads the newest backup's `saved_at` from its metadata instead of keeping a timer in memory, because every exit-85 restart is a new process and a resubmitted job is a new job. `load_newest()` takes the local store first on ties.
 - **`CheckpointStore` creates its directory in `__init__`,** because spool mode holds the job if a directory named in `transfer_checkpoint_files` doesn't exist at the first exit 85.
 - **Lessons from recipe 0's HTCondor tests:**
   - A checkpoint *directory* must be named in `transfer_output_files` as well as `transfer_checkpoint_files`. HTCondor's default output transfer brings back only top-level files.
   - `shell = exec python3 ...` delivers SIGTERM to Python.
+- **Lesson from recipe 1's first HTCondor runs:** create every directory named in `transfer_output_files` as the very first thing the job does. A crash before they existed (e.g. a bad data path) turned into a hold for "No such file or directory" on output transfer, hiding the real error. `CheckpointStore` already creates its directory in `__init__`, but recipes should create both their checkpoint and output directories before loading data or building models.
 
 ## Later
 

@@ -29,6 +29,21 @@ Typical use (PyTorch shown, but the store doesn't care what you write):
     store.save(step, lambda d: torch.save(state, os.path.join(d, "state.pt")),
                metadata={"reason": "timed"})
 
+Backups that outlive the job (spool + /staging):
+
+In spool mode, HTCondor deletes the spooled checkpoint when the job leaves the queue
+(condor_rm, a removal policy, resubmitting after a crash). Keep occasional copies in a
+second store on /staging, named after the run (not the job id, which changes when you
+resubmit), and resume from whichever store has the newest checkpoint:
+
+    local = CheckpointStore("checkpoints", keep=1)                          # spool
+    backups = CheckpointStore("/staging/<user>/<run>/backups", keep=2)       # outlives the job
+    path, state = load_newest([local, backups], read_fn)
+    ...
+    info = local.save(step, write_fn, meta)                 # every timed checkpoint
+    if backup_due(backups, every_seconds=12 * 3600):        # only now and then
+        backup(info["path"], backups)
+
 Standard library only. No imports from the other htcondor_ckpt modules, so this file
 can be copied into a project on its own.
 """
@@ -175,3 +190,66 @@ def _write_atomic(path, text):
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
+
+
+# --------------------------------------------------------------------- several stores, backups
+def newest(stores):
+    """The newest complete checkpoint across several stores: (store, path), or (None, None).
+    On a tie (the same step in two stores), the store listed first wins, so list the
+    local one first."""
+    best = (None, None, -1)
+    for store in stores:
+        for step, path in store.complete():
+            if step > best[2]:
+                best = (store, path, step)
+    return best[0], best[1]
+
+
+def load_newest(stores, read_fn):
+    """Like CheckpointStore.load, across several stores: try checkpoints newest step first
+    (local store first on ties); if one fails to load, warn and try the next. Returns
+    (path, result), or (None, None)."""
+    ordered = []
+    for rank, store in enumerate(stores):
+        ordered += [(-step, rank, path) for step, path in store.complete()]
+    for _, _, path in sorted(ordered):
+        try:
+            return path, read_fn(path)
+        except Exception as e:
+            print("WARNING: could not load checkpoint %s (%s: %s); trying an older one"
+                  % (path, type(e).__name__, e), file=sys.stderr, flush=True)
+    return None, None
+
+
+def backup_due(backup_store, every_seconds, now=None):
+    """True if the newest backup is older than `every_seconds` (or there is none yet).
+
+    The answer comes from the newest backup's metadata.json (its "saved_at" wall-clock
+    time), not from memory, so it stays right across exit-85 restarts and resubmissions."""
+    complete = backup_store.complete()
+    if not complete:
+        return True
+    saved_at = backup_store.metadata(complete[-1][1]).get("saved_at", 0)
+    return (now if now is not None else time.time()) - saved_at >= every_seconds
+
+
+def backup(checkpoint_path, backup_store):
+    """Copy a complete checkpoint into another store (e.g. from spool to /staging),
+    with the same write-then-rename safety as any save. Returns the save info dict."""
+    with open(os.path.join(checkpoint_path, METADATA)) as f:
+        meta = json.load(f)
+    step = meta["step"]
+
+    def copy_files(dest):
+        for name in os.listdir(checkpoint_path):
+            if name == METADATA:
+                continue  # rewritten by save(), below
+            src = os.path.join(checkpoint_path, name)
+            if os.path.isdir(src):
+                shutil.copytree(src, os.path.join(dest, name))
+            else:
+                shutil.copy2(src, dest)
+
+    meta = {k: v for k, v in meta.items() if k not in ("step", "saved_at", "save_seconds")}
+    meta["backup_of"] = checkpoint_path
+    return backup_store.save(step, copy_files, meta)

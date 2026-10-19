@@ -1,0 +1,26 @@
+# Apptainer definition for recipe 1: CUDA PyTorch + the packages in requirements.txt.
+# Build it in a CHTC interactive build job (8 CPUs, 16 GB memory, 30 GB disk), then copy it to /staging:
+#   apptainer build recipe1.sif container.def
+#   apptainer exec recipe1.sif python3 -c "import torch, tiktoken, yaml, shutil; assert torch.version.cuda; assert shutil.which('gcc')"
+#   mv recipe1.sif /staging/<user>/<path>/
+# (The check confirms a CUDA build of PyTorch and a C compiler; it doesn't need a GPU.)
+# The base image's CUDA (12.8) must not be newer than the GPU driver supports: CHTC's GPU
+# slots reported driver CUDA 12.8 (docs/environment.md). Check the tag exists on Docker Hub.
+Bootstrap: docker
+From: pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
+
+%files
+    requirements.txt /opt/requirements.txt
+
+%post
+    # CHTC builds: apt fails with "Couldn't create temporary file /tmp/apt.conf..." unless /tmp
+    # is writable first (CHTC's documented workaround; not needed when building elsewhere).
+    chmod 777 /tmp
+    # torch.compile (via Triton) needs a C compiler at run time; "runtime" images don't have one.
+    apt-get update -y && apt-get install -y --no-install-recommends gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+    python3 -m pip install --no-cache-dir -r /opt/requirements.txt
+    # Download the GPT-2 tokenizer files into the image, so jobs never need to fetch them.
+    TIKTOKEN_CACHE_DIR=/opt/tiktoken python -c "import tiktoken; tiktoken.get_encoding('gpt2')"
+
+%environment
+    export TIKTOKEN_CACHE_DIR=/opt/tiktoken

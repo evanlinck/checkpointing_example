@@ -7,12 +7,14 @@
 # the shell replace itself with Python, so Python is the process that hears it.
 # The same command works for the first start and every restart: train.py resumes
 # from its newest checkpoint automatically.
-#   --max-runtime-seconds      save and exit 85 every hour (the timed checkpoint)
+#   --max-runtime-seconds      save and exit 85 every 6 hours (the timed checkpoint). CHTC usually suggests 4–6 hours on the OSPool (up to 8) and 6–10 hours on CHTC backfill.
+#                              An eviction (SIGTERM) gets its own save, so this interval only limits what a
+#                              hard kill can take; each timed checkpoint costs a save plus a restart.
 #   --step-delay               slows this toy model down so the job runs long enough to interrupt
-shell                     = exec python3 train.py --max-runtime-seconds 3600 --step-delay 0.1
+shell                     = exec python3 train.py --max-runtime-seconds 21600 --step-delay 0.1
 # Alternative to `shell`: a wrapper script that does the same `exec` (see run.sh).
 # executable              = run.sh
-# arguments               = --max-runtime-seconds 3600 --step-delay 0.1
+# arguments               = --max-runtime-seconds 21600 --step-delay 0.1
 
 # Files copied to the machine where the job runs.
 transfer_input_files      = train.py

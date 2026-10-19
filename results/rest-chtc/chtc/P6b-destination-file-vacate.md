@@ -17,27 +17,27 @@ Job: `6574209.0`   Test dir: `/home/<user>/probes/runs/rest-chtc/chtc/P6b-destin
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| bb8b3d81 | 09:00:12.5 | e4022 | False | 0 | None (None) |  | [(60, 'voluntary', 0.008)] | 85 |
-| 3b82e95d | 09:19:18.7 | e4017 | False | 1 | None (None) |  | [(60, 'voluntary', 0.008)] | 85 |
+| bb8b3d81 | 09:00:12.5 | <host-1> | False | 0 | None (None) |  | [(60, 'voluntary', 0.008)] | 85 |
+| 3b82e95d | 09:19:18.7 | <host-2> | False | 1 | None (None) |  | [(60, 'voluntary', 0.008)] | 85 |
 
 ## HTCondor event log (AP clock)
 
 - 08:59:45.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc__P6b-destination-file-vacate"; JobBatchName = "probes.dag+6573176" ]
-- 09:00:03.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e4022.chtc.wisc.edu&noUDP&sock=slot1_13_2697437_2353_118261>
+- 09:00:03.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=slot1_13_2697437_2353_118261>
 - 09:00:11.0 `040 file_transfer` Finished transferring input files 
-- 09:00:11.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_13@e4022.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_83907/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
+- 09:00:11.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_13@<host-1>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_83907/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
 - 09:01:13.0 `040 file_transfer` Started transferring output files 
 - 09:18:43.0 `040 file_transfer` Finished transferring output files 
-- 09:18:43.0 `021 remote_error` Error from starter on slot1_13@e4022.chtc.wisc.edu: — Starter failed to upload checkpoint; Code 36 Subcode -1
+- 09:18:43.0 `021 remote_error` Error from starter on slot1_13@<host-1>: — Starter failed to upload checkpoint; Code 36 Subcode -1
 - 09:18:43.0 `004 evicted` Job was evicted. Code 1022 Subcode 0 — (0) CPU times; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; 0  -  Run Bytes Sent By Job; 286336878  -  Run Bytes Received By Job; Reason: Job vacated by schedd; Cpus                 :        0        1         1; Disk (KB)            :   27
-- 09:19:10.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e4017.chtc.wisc.edu&noUDP&sock=slot1_96_3342259_9201_123520>
+- 09:19:10.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-2>&noUDP&sock=slot1_96_3342259_9201_123520>
 - 09:19:17.0 `040 file_transfer` Finished transferring input files 
-- 09:19:17.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_96@e4017.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_1043518/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
+- 09:19:17.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_96@<host-2>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_1043518/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
 - 09:20:19.0 `040 file_transfer` Started transferring output files 
 - 09:37:50.0 `040 file_transfer` Finished transferring output files 
-- 09:37:50.0 `021 remote_error` Error from starter on slot1_96@e4017.chtc.wisc.edu: — Starter failed to upload checkpoint; Code 36 Subcode -1
-- 09:38:00.0 `004 evicted` Job was evicted. Code 36 Subcode -1 — (0) CPU times; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; 0  -  Run Bytes Sent By Job; 286336878  -  Run Bytes Received By Job; Reason: Error from slot1_96@e4017.chtc.wisc.edu: Starter failed to upload checkpoint; Cpus                 :  
-- 09:38:00.0 `012 held` Job was held. — Error from slot1_96@e4017.chtc.wisc.edu: Starter failed to upload checkpoint; Code 36 Subcode -1
+- 09:37:50.0 `021 remote_error` Error from starter on slot1_96@<host-2>: — Starter failed to upload checkpoint; Code 36 Subcode -1
+- 09:38:00.0 `004 evicted` Job was evicted. Code 36 Subcode -1 — (0) CPU times; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; 0  -  Run Bytes Sent By Job; 286336878  -  Run Bytes Received By Job; Reason: Error from slot1_96@<host-2>: Starter failed to upload checkpoint; Cpus                 :  
+- 09:38:00.0 `012 held` Job was held. — Error from slot1_96@<host-2>: Starter failed to upload checkpoint; Code 36 Subcode -1
 - 09:48:57.0 `009 aborted` Job was aborted. — The job attribute PeriodicRemove expression '((time() - QDate) > 7200) || (JobStatus == 5 && (time() - EnteredCurrentStatus) > 600)' evaluated to TRUE
 
 ## condor_history (selected)
@@ -51,10 +51,10 @@ ExitBySignal = false
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = -1
 JobCurrentStartTransferOutputDate = 1790950818
-LastHoldReason = Error from slot1_96@e4017.chtc.wisc.edu: Starter failed to upload checkpoint
+LastHoldReason = Error from slot1_96@<host-2>: Starter failed to upload checkpoint
 LastHoldReasonCode = 36
 LastHoldReasonSubCode = -1
-LastRemoteHost = slot1_96@e4017.chtc.wisc.edu
+LastRemoteHost = slot1_96@<host-2>
 LastRemoteWallClockTime = 1130.0
 LastVacateTime = 1790950723
 NumCkpts = 0
@@ -78,7 +78,7 @@ TransferOutFinished = 1790951870
 TransferOutStarted = 1790950819
 TransferOutput = ckpt,out
 TransferOutputStats = [ FILESizeBytesTotal = 0; CedarSizeBytesTotal = 1136; FILEFilesCountTotal = 10; CedarFilesCountTotal = 2; FILESizeBytesLastRun = 0; CedarSizeBytesLastRun = 568; FILEFilesCountLastRun = 5; CedarFilesCountLastRun = 1 ]
-VacateReason = Error from slot1_96@e4017.chtc.wisc.edu: Starter failed to upload checkpoint
+VacateReason = Error from slot1_96@<host-2>: Starter failed to upload checkpoint
 VacateReasonCode = 36
 VacateReasonSubCode = -1
 WantFTOnCheckpoint = true

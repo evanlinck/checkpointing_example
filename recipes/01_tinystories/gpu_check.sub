@@ -1,0 +1,24 @@
+# A 1-minute check that the container can see and use its GPU, before running training.
+#   condor_submit gpu_check.sub -a "container_image = $RECIPE1_IMAGE"      then read gpu_check.out
+# The same check, forced onto a GPU backfill slot (training jobs with +is_resumable can land there):
+#   condor_submit gpu_check.sub -a "container_image = $RECIPE1_IMAGE" -a "+is_resumable = true" \
+#                               -a "requirements = TARGET.BackfillSlot =?= true"
+#
+# It prints the machine and slot, which GPU HTCondor assigned, and whether PyTorch can actually use it.
+# (The machine name comes from Python: the container has no `hostname` command.)
+# (nvidia-smi isn't used: in Apptainer it comes from the host, and CHTC's containers don't get it.)
+
+shell                     = export HOME=$PWD; env | grep -E "CUDA_VISIBLE|_CONDOR_AssignedGPUs|_CONDOR_SLOT" | sort; exec python3 -c "import socket, torch; print('host', socket.gethostname()); print('torch', torch.__version__, 'built for CUDA', torch.version.cuda); print('devices visible:', torch.cuda.device_count()); p = torch.cuda.get_device_properties(0); print('GPU:', p.name, 'capability %d.%d' % (p.major, p.minor), '%.0f GB' % (p.total_memory / 1e9)); x = torch.ones(1).cuda(); free, total = torch.cuda.mem_get_info(); print('tensor on GPU OK; memory in use by others: %.1f GB of %.0f GB' % ((total - free) / 1e9, total / 1e9))"
+
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe1.sif
+request_gpus              = 1
++WantGPULab               = true
++GPUJobLength             = "short"
+request_cpus              = 1
+request_memory            = 4GB
+request_disk              = 10GB
+
+log                       = gpu_check.log
+output                    = gpu_check.out
+error                     = gpu_check.err
+queue
