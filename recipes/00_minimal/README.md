@@ -53,7 +53,7 @@ The checkpoint is the state after the last *completed* step, and the data positi
 
 ## What happens when HTCondor stops your job
 
-**Timed checkpoint** (every `--max-runtime-seconds`, default 1 hour):
+**Timed checkpoint** (every `--max-runtime-seconds`: 6 hours in `job_chtc.sub`, 5 hours in `job_ospool.sub`):
 ```
 timer fires → save → exit 85 → HTCondor saves the checkpoint directory → restarts the job, usually in place, within seconds
 ```
@@ -76,7 +76,7 @@ That last case is why the timed checkpoint matters. It is the only protection ag
 From [`job_chtc.sub`](job_chtc.sub) (every line there has a comment explaining it):
 
 ```
-shell                     = exec python3 train.py --max-runtime-seconds 3600
+shell                     = exec python3 train.py --max-runtime-seconds 21600
 transfer_input_files      = train.py
 checkpoint_exit_code      = 85
 transfer_checkpoint_files = checkpoints
@@ -161,7 +161,7 @@ For a CPU job like this one, `condor_ssh_to_job <job>` also opens a shell inside
 Copy the five blocks. Then make sure:
 - **Everything that changes during training is in the `state` dictionary in `save_checkpoint`:** model, optimizer, scheduler, counters, data position, RNG states. Then check that the resume block restores each one.
 - **Your data order can be rebuilt from `(epoch, batch_index)`** (seeded shuffling per epoch), or save your data loader's state.
-- **The checkpoint interval matches the work you can afford to redo.** An hour is a reasonable start; restarts in place cost only seconds.
+- **The checkpoint interval fits your pool and your job.** CHTC usually suggests 4–6 hours on the OSPool (up to 8) and 6–10 hours on CHTC backfill. An eviction (SIGTERM) gets its own save, so the timed interval only limits what a hard kill can take. Each timed checkpoint costs a save, a transfer and a restart (starting the container, loading data, `import torch`). Keep that total small compared with the interval.
 - **On GPUs:** add the commented GPU lines in the submit file, including `+is_resumable = true`. Use a CUDA-enabled PyTorch image.
 - **Keep `exec`** in front of your command in the `shell` line.
 

@@ -28,8 +28,9 @@ import torch
 
 # Settings
 parser = argparse.ArgumentParser(description="Recipe 0: a minimal checkpointing job.")
-parser.add_argument("--max-runtime-seconds", type=float, default=3600,
-                    help="after this long, save and exit 85 (the timed checkpoint)")
+parser.add_argument("--max-runtime-seconds", type=float, default=6 * 3600,
+                    help="after this long, save and exit 85 (the timed checkpoint). Default 6 h; "
+                         "CHTC suggests 4-6 h on the OSPool and 6-10 h on CHTC backfill")
 parser.add_argument("--epochs", type=int, default=10, help="passes over the data")
 parser.add_argument("--log-every", type=int, default=100, help="print the loss every N steps")
 parser.add_argument("--step-delay", type=float, default=0.0,

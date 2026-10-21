@@ -20,14 +20,14 @@ Job: `6527260.0`   Test dir: `/home/<user>/probes/runs/smoke/chtc/P0-fingerprint
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| e6828352 | 13:28:44.4 | e2472 | False | 0 | None (None) |  | [] | 0 |
+| e6828352 | 13:28:44.4 | <host-1> | False | 0 | None (None) |  | [] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 13:27:57.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc__P0-fingerprint-bare"; JobBatchName = "probes.dag+6527258" ]
-- 13:28:44.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2472.chtc.wisc.edu&noUDP&sock=slot1_37_3663014_7c14_98074>
+- 13:28:44.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=slot1_37_3663014_7c14_98074>
 - 13:28:44.0 `040 file_transfer` Finished transferring input files 
-- 13:28:44.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_37@e2472.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_1590324/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
+- 13:28:44.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_37@<host-1>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_1590324/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
 - 13:28:44.0 `040 file_transfer` Started transferring output files 
 - 13:28:44.0 `040 file_transfer` Finished transferring output files 
 - 13:28:44.0 `005 terminated` Job terminated. — (1) Normal termination (return value 0); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 31976  -  Run Bytes Sent By Job; 29796  -  Ru

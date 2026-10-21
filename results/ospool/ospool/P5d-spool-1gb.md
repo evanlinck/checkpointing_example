@@ -15,16 +15,16 @@ Job: `6589422.0`   Test dir: `/home/<user>/probes/runs/ospool/ospool/P5d-spool-1
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 23935cb5 | 11:53:55.8 | wizard26 | False | 0 | None (None) |  | [(30, 'voluntary', 13.15)] | 85 |
-| d329a27a | 11:54:45.0 | wizard26 | True | 0 | 30 (voluntary) |  | [(60, 'final', 6.063)] | 0 |
+| 23935cb5 | 11:53:55.8 | <host-1> | False | 0 | None (None) |  | [(30, 'voluntary', 13.15)] | 85 |
+| d329a27a | 11:54:45.0 | <host-1> | True | 0 | 30 (voluntary) |  | [(60, 'final', 6.063)] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 11:51:36.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "ospool__P5d-spool-1gb"; JobBatchName = "probes.dag+6586482" ]
 - 11:53:13.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:33291?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[<ipv6>]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector4#14594989%2067.58.49.91:9618%3faddrs%3d67.58.49.91-9618+[<ipv6>]-9618%26al
 - 11:53:53.0 `040 file_transfer` Finished transferring input files 
-- 11:53:54.0 `021 remote_error` Message from starter on slot1_2@glidein_938111_11644727@wizard26.beocat.ksu.edu: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
-- 11:53:54.0 `001 executing` Job executing on host: <<ip>:46453?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_2@glidein_938111_11644727@wizard26.beocat.ksu.edu; CondorScratchDir = "/tmp/glide_pBgXzP/execute/dir_3294382/scratch"; Cpus = 1; Disk = 4194304; GPUs = 0; Memory = 1024
+- 11:53:54.0 `021 remote_error` Message from starter on slot1_2@glidein_938111_11644727@<host-1>: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
+- 11:53:54.0 `001 executing` Job executing on host: <<ip>:46453?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_2@glidein_938111_11644727@<host-1>; CondorScratchDir = "/tmp/glide_pBgXzP/execute/dir_3294382/scratch"; Cpus = 1; Disk = 4194304; GPUs = 0; Memory = 1024
 - 11:54:39.0 `040 file_transfer` Started transferring output files 
 - 11:54:44.0 `040 file_transfer` Finished transferring output files 
 - 11:55:22.0 `040 file_transfer` Started transferring output files 
@@ -43,7 +43,7 @@ ExitCode = 0
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = 1790960122
 JobCurrentStartTransferOutputDate = 1790960122
-LastRemoteHost = slot1_2@glidein_938111_11644727@wizard26.beocat.ksu.edu
+LastRemoteHost = slot1_2@glidein_938111_11644727@<host-1>
 LastRemoteWallClockTime = 131.0
 NumCkpts = 0
 NumCkpts_RAW = 0
@@ -79,7 +79,7 @@ WhenToTransferOutput = ON_EXIT
 11:54:39.2 23935cb5 exit                   {"code": 85, "reason": "voluntary exit at step 30", "step": 30}
 11:54:45.0 d329a27a start                  {"cwd": "/srv/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 1, "python": "3.12.14", "sandbox_created_by": "23935cb5", "sandbox_marker_survived": true, "scratch_dir": "/srv/scratch"}
 11:54:45.0 d329a27a history_attached       {"ckpt_dir": "/srv/scratch/ckpt", "store": "spool"}
-11:54:45.0 d329a27a restore                {"chosen": "step_00000030", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000030", "nested_dir_ok": true, "saved_at": 1790960079.04091, "saved_by_exec": "23935cb5", "saved_on_host": "wizard26", "saved_reason": "voluntary", "step": 30}
+11:54:45.0 d329a27a restore                {"chosen": "step_00000030", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000030", "nested_dir_ok": true, "saved_at": 1790960079.04091, "saved_by_exec": "23935cb5", "saved_on_host": "<host-1>", "saved_reason": "voluntary", "step": 30}
 11:54:45.0 d329a27a loop_start             {"restored_step": 30, "step": 30, "total_steps": 60, "voluntary_exit_at": [30]}
 11:55:16.1 d329a27a save_start             {"ckpt_files": 1, "ckpt_mb": 1000, "reason": "final", "step": 60}
 11:55:22.2 d329a27a save_done              {"bytes": 1048576000, "dir_fsync_ok": true, "reason": "final", "seconds": 6.063, "step": 60, "write_seconds": 5.911}

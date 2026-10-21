@@ -1,0 +1,48 @@
+# Recipe 1 settings. Any of these can be overridden from the command line:
+#   python3 train.py --config config.yaml --set epochs=5 --set ckpt_dir=/staging/<user>/run1/checkpoints
+
+# --- data (made by prepare_data.py) ---
+data_dir: "."            # where train.bin and val.bin are (the submit file transfers them into the job's directory)
+
+# --- model: 51M parameters (26M of them the token embedding, shared with the output layer) ---
+vocab_size: 50304        # GPT-2's 50257 tokens, padded to a multiple of 64
+block_size: 512          # context length
+n_layer: 8
+n_head: 8
+n_embd: 512
+dropout: 0.1
+
+# --- training ---
+epochs: 6                # per epoch: ~35 min on an L40 (224k tokens/s), ~7.5 min on an H200 (1.06M tokens/s)
+batch_size: 64           # sequences per step (64 x 512 = 32,768 tokens)
+lr: 0.0006
+min_lr: 0.00006
+warmup_steps: 500
+weight_decay: 0.1
+grad_clip: 1.0
+seed: 1337
+compile: true            # torch.compile: faster steps, but adds start-up time to every restart
+deterministic: false     # true makes resumed runs match exactly, at some speed cost (the local tests use true)
+
+# --- evaluation and logging ---
+eval_every_steps: 1000
+eval_batches: 20         # validation loss is measured on the same 20 x 64 sequences every time
+sample_stories: true     # write sample stories to outputs/samples.txt at each epoch end
+log_every: 50
+
+# --- checkpointing ---
+checkpoint_at: interval  # "interval": save whenever asked to stop, mid-epoch if needed (the default)
+                         # "epoch":    save only at epoch ends; a stop mid-epoch redoes that epoch
+ckpt_dir: checkpoints    # resumable checkpoints
+out_dir: outputs         # what you keep: best model, sample stories, metrics log
+keep_checkpoints: 1      # 1 in spool mode (small transfers); 2 on /staging (a fallback if the newest is damaged)
+max_runtime_seconds: 21600   # the timed checkpoint: save and exit 85 after 6 h (OSPool: 4-6 h; CHTC backfill: 6-10 h)
+save_every_minutes: 0    # extra in-place saves, without exiting; useful on /staging (e.g. 15), not in spool mode
+backup_dir: ""           # e.g. /staging/<user>/tinystories-run1/backups: copies that outlive the job ("" = off)
+backup_every_hours: 12   # how often a timed checkpoint is also copied to backup_dir
+
+# --- optional ---
+wandb: false             # log to Weights & Biases (needs network and an API key); resumes the same W&B run
+wandb_project: tinystories-checkpointing
+step_delay: 0.0          # seconds to sleep per step: only for tests that need a slow job
+max_steps: 0             # stop (as if finished) after this many steps; 0 = train all epochs. For tests and smoke runs

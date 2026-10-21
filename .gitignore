@@ -14,6 +14,11 @@ wheels/
 
 # Output of running recipes and examples (checkpoints, job logs, test runs, container images)
 checkpoints/
+outputs/
+hf_cache/
+prepare.log
+prepare.out
+prepare.err
 job.log
 job.out
 job.err
@@ -22,6 +27,8 @@ test_*_[0-9]*.out
 test_*_[0-9]*.err
 test_*_[0-9]*.evicted/
 test_*_[0-9]*.evicted.txt
+test_*_[0-9]*.checkpoints/
+test_*_[0-9]*.outputs/
 *.sif
 
 # Probe results: keep the human-readable summaries (cited by docs/environment.md);
@@ -30,3 +37,9 @@ results/**
 !results/**/
 !results/**/*.md
 result_*.txt
+
+# Editor tooling bookkeeping
+.cc-writes/
+
+# Copies of the shared modules placed next to a recipe for job submission
+recipes/*/htcondor_ckpt/

@@ -14,7 +14,7 @@ Typical use, checked once per training step:
 
     from stop import StopPolicy, EXIT_RESTART
 
-    policy = StopPolicy(max_runtime_seconds=3600)
+    policy = StopPolicy(max_runtime_seconds=6 * 3600)   # OSPool: 4-6 h; CHTC backfill: 6-10 h
     ...
     for batch in loader:
         train_step(batch)
@@ -75,13 +75,16 @@ class StopPolicy:
                 signal.signal(sig, self._on_signal)
 
     def _on_signal(self, signum, frame):
-        if self.reason is None:  # keep the first request; ignore repeats
+        # Keep the first eviction request and ignore repeats. A pending *timed* stop is
+        # replaced: an eviction is more urgent (e.g. a job that waits for the end of an
+        # epoch before its timed checkpoint must not miss HTCondor's SIGKILL deadline).
+        if not self.evicting():
             self.reason, self.stop_time = "signal", self.clock()
             self.signal_name = signal.Signals(signum).name
 
     def should_stop(self):
         """True if the job should save and stop now. Cheap enough to call every step."""
-        if self.reason is None and self.stop_file and os.path.exists(self.stop_file):
+        if not self.evicting() and self.stop_file and os.path.exists(self.stop_file):
             self.reason, self.stop_time = "stop_file", self.clock()
         if (self.reason is None and self.max_runtime_seconds is not None
                 and self.clock() - self.start >= self.max_runtime_seconds):

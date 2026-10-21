@@ -14,14 +14,14 @@ Job: `6574106.0`   Test dir: `/home/<user>/probes/runs/rest-chtc/chtc/P8c-no-ckp
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| b2aa7c6d | 08:58:45.6 | e2473 | False | 0 | None (None) |  | [(30, 'voluntary', 1.225)] | 85 |
+| b2aa7c6d | 08:58:45.6 | <host-1> | False | 0 | None (None) |  | [(30, 'voluntary', 1.225)] | 85 |
 
 ## HTCondor event log (AP clock)
 
 - 08:58:30.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc__P8c-no-ckpt-code"; JobBatchName = "probes.dag+6573176" ]
-- 08:58:39.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2473.chtc.wisc.edu&noUDP&sock=slot1_19_342642_0927_94155>
+- 08:58:39.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=slot1_19_342642_0927_94155>
 - 08:58:44.0 `040 file_transfer` Finished transferring input files 
-- 08:58:45.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_19@e2473.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_3548336/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
+- 08:58:45.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_19@<host-1>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_3548336/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
 - 08:59:17.0 `040 file_transfer` Started transferring output files 
 - 08:59:17.0 `040 file_transfer` Finished transferring output files 
 - 08:59:17.0 `005 terminated` Job terminated. — (1) Normal termination (return value 85); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 1053700  -  Run Bytes Sent By Job; 286336878
@@ -37,7 +37,7 @@ ExitCode = 85
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = -1
 JobCurrentStartTransferOutputDate = 1790949557
-LastRemoteHost = slot1_19@e2473.chtc.wisc.edu
+LastRemoteHost = slot1_19@<host-1>
 LastRemoteWallClockTime = 39.0
 NumCkpts = 0
 NumCkpts_RAW = 0

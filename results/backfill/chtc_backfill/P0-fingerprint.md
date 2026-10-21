@@ -20,14 +20,14 @@ Job: `6573293.0`   Test dir: `/home/<user>/probes/runs/backfill/chtc_backfill/P0
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| a4dfbf66 | 08:53:22.2 | gpu4000 | False | 0 | None (None) |  | [] | 0 |
+| a4dfbf66 | 08:53:22.2 | <host-1> | False | 0 | None (None) |  | [] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 08:49:46.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc_backfill__P0-fingerprint"; JobBatchName = "probes.dag+6573292" ]
-- 08:49:52.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=gpu4000.chtc.wisc.edu&noUDP&sock=slot2_8_4130900_7fa7_70562>
+- 08:49:52.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=slot2_8_4130900_7fa7_70562>
 - 08:53:21.0 `040 file_transfer` Finished transferring input files 
-- 08:53:21.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot2_8@gpu4000.chtc.wisc.edu; AvailableGPUs = { GPUs_GPU_cdbf3fca }; CondorScratchDir = "/var/lib/condor/execute/slot2/dir_1001781/scratch"; Cpus = 1; Disk = 2097152; GPUs = 1; GPUs_GPU_cdbf3fca = [ Id = "GPU-cdbf3fca"; Capability = 8.9; DeviceName = "NVIDIA L40"; DeviceUuid = "cdbf3fca-8
+- 08:53:21.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot2_8@<host-1>; AvailableGPUs = { GPUs_GPU_cdbf3fca }; CondorScratchDir = "/var/lib/condor/execute/slot2/dir_1001781/scratch"; Cpus = 1; Disk = 2097152; GPUs = 1; GPUs_GPU_cdbf3fca = [ Id = "GPU-cdbf3fca"; Capability = 8.9; DeviceName = "NVIDIA L40"; DeviceUuid = "cdbf3fca-8
 - 08:53:22.0 `040 file_transfer` Started transferring output files 
 - 08:53:22.0 `040 file_transfer` Finished transferring output files 
 - 08:53:22.0 `005 terminated` Job terminated. — (1) Normal termination (return value 0); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 38988  -  Run Bytes Sent By Job; 286336878  -
@@ -43,7 +43,7 @@ ExitCode = 0
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = -1
 JobCurrentStartTransferOutputDate = 1790949202
-LastRemoteHost = slot2_8@gpu4000.chtc.wisc.edu
+LastRemoteHost = slot2_8@<host-1>
 LastRemoteWallClockTime = 210.0
 NumCkpts = 0
 NumCkpts_RAW = 0

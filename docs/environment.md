@@ -72,6 +72,21 @@ All slot types report `MachineMaxVacateTime = 10 * 60`.
 | Backfill | `JobRuntimeGuarantee = 30` → 30 s retirement | `PREEMPT = size(ResourceConflict) > 0`: a higher-priority claim needs the GPU. After the first 30 s of runtime, eviction means immediate SIGTERM, then SIGKILL after 600 s. Matches what `condor_vacate_job` gave us on a backfill slot. | grep of P0 machine ad, `backfill2` |
 | OSPool | 10,000,000 s (1200 s if `SiteWMS_WN_Preempt`; −1/0 on disk or memory overuse) | HTCondor essentially never evicts by policy. Real evictions come from the glidein's batch allocation ending (`GLIDEIN_ToRetire`) or the site; those can't be simulated with `condor_vacate_job` and may give no SIGTERM. | P0, `ospool` |
 
+### Observed: a real backfill eviction (recipe 1 tests, 2026-10-19)
+
+Two recipe 1 test jobs ran on backfill slots of the same machine (`backfill1_5` and `backfill1_7`, both `BackfillSlot = true`). About 75 s after they started, both were evicted in the same second, without any command from us:
+
+- **Event log:** `004 Job was evicted. Code 1011`, `Reason: PREEMPT expression evaluated to True`. This confirms the policy row above: the backfill `PREEMPT` fired because the GPU's owner needed it. For comparison, our `condor_vacate_job` gives `Code 1022`, "Job vacated by schedd" (P2a, P3a in `backfill2`, and the same tests).
+- **In the job:** SIGTERM arrived; `vacate_budget()` reported a 600 s window from `MachineMaxVacateTime`.
+  - Both jobs saved (615 MB, 2 files) and exited 85 well inside the window.
+  - With spool + `ON_EXIT_OR_EVICT` + the checkpoint directory in `transfer_output_files`, both saves came back.
+  - Both jobs resumed from them: one ~1.5 min later on another backfill slot of the same machine, the other on a different machine.
+  - The grace period itself wasn't measured: the jobs exited long before SIGKILL.
+- **Save time doubled:** these two saves took 12.4 and 12.5 s, against 2.5–5.6 s for every other save in the same tests. Both jobs wrote at the same moment on the same machine, which is the likely cause. Expect slower saves when one eviction hits several jobs on a node.
+- **A third job never started:** it was evicted during input transfer (`Code 1008`) and ran elsewhere.
+
+Source: recipe 1 `test_htcondor.sh` runs, jobs 6799595–6799597, on ap2002.
+
 Possible explanation for P3c: a job's `job_max_vacate_time` above `MachineMaxVacateTime` may be honored because the slot still has retirement time left. Both slots where 900 s was granted have long retirement times: 72 h on CHTC CPU, ~10⁷ s on OSPool. Backfill (30 s retirement) may cap it at 600 s. Not yet tested there.
 
 ## 4. Checkpoint durability
@@ -143,7 +158,7 @@ Single run per number; treat these as orders of magnitude.
    - spool with `checkpoint_exit_code = 85`, `when_to_transfer_output = ON_EXIT_OR_EVICT`, **and** the checkpoint directory in `transfer_output_files`. (HTCondor's default output transfer brings back only new top-level files, not directories. Recipe 0's first vacate test left `transfer_output_files` unset and lost B; with the directory named, the rerun on 2026-10-05 restored B: the save made after SIGTERM at step 722.) This works on every pool tested and falls back to the last planned checkpoint after a hard kill.
 
    With `checkpoint_exit_code` alone, a SIGTERM save is wasted.
-2. **Planned exit-85 checkpoints are cheap** (seconds) and are the only protection against hard kills and OSPool glidein ends. Keep a timed exit (~1 h, per the HTCondor manual's suggestion) in every recipe.
+2. **Planned exit-85 checkpoints are cheap** (seconds) and are the only protection against hard kills and OSPool glidein ends. Keep a timed exit in every recipe. CHTC usually suggests 4–6 h on the OSPool (up to 8) and 6–10 h on CHTC backfill. That's longer than the manual's generic "about once an hour", because evictions with SIGTERM get their own save.
 3. **GPU recipes should set `+is_resumable = true`.** On GPU Lab slots it turns the runtime limit into a restartable eviction instead of a hold (inferred from policy), and it makes backfill possible.
 4. **Plan on 600 s from SIGTERM to SIGKILL.** Don't ask for more on backfill: it is the owner's time.
 5. **Always `exec`** the training process (or use a wrapper that handles the signal). Workers and DataLoader children don't need their own SIGTERM handling under HTCondor.
@@ -157,7 +172,7 @@ Single run per number; treat these as orders of magnitude.
 | Item | Why it matters | How to close it |
 |---|---|---|
 | Recipe 3 checkpoint size vs. the default `/staging` quota | A ~100 GB checkpoint (8B model + AdamW) fills the default 100 GB quota before a second one is kept | Users can request a larger `/staging` quota from CHTC. Recipe 3's README should say how much to ask for (checkpoint size × checkpoints kept + one in progress) and how many files |
-| A real backfill eviction (P3e) | Confirms the policy reading in section 3 | Opt-in P3e on `chtc_backfill` (holds a GPU up to 6 h) |
+| ~~A real backfill eviction (P3e)~~ | Closed: observed in recipe 1's tests (section 3, "Observed"). Still unmeasured: the grace period on a real eviction, and SIGKILL timing for a job that doesn't exit | Optional: P3e on `chtc_backfill` (holds a GPU up to 6 h) |
 | `job_max_vacate_time` above 600 on backfill / GPU Lab | Whether a job's request is capped where retirement is short | P3c on `chtc_backfill` |
 | Effective vacate window from the ads at job start | Planned `vacate_budget()` helper | Log the estimate in probe starts; compare to P3 measurements |
 | OSPool glidein-end eviction | Whether OSPool jobs ever get SIGTERM in practice | Hard to test on demand; rely on timed exit-85 checkpoints |

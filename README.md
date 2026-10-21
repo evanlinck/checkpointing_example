@@ -21,7 +21,7 @@ From the measurements in [`docs/environment.md`](docs/environment.md):
 
 - **Evictions give you 600 seconds.** On every slot type tested, HTCondor sends SIGTERM within seconds (usually under one) of evicting a job, then kills it 600 s later.
 - **A save made after SIGTERM is lost** unless the checkpoint lives on `/staging`, or the submit file adds `when_to_transfer_output = ON_EXIT_OR_EVICT` and names the checkpoint directory in `transfer_output_files`, alongside `checkpoint_exit_code = 85`.
-- **A planned exit 85 is cheap.** The job usually restarts in place within seconds, so checkpointing on a timer (~1 h) costs little and protects against hard kills.
+- **A planned exit 85 is cheap.** The job usually restarts in place within seconds, so checkpointing on a timer (CHTC suggests 4–6 h on the OSPool and 6–10 h on CHTC backfill) costs little and protects against hard kills.
 - **Only the top process gets the signal.** Shell wrappers must `exec`; `torchrun` needs a wrapper (it kills workers after ~30 s and turns exit 85 into 1).
 - **GPU jobs should set `+is_resumable = true`.** It makes backfill possible and, by CHTC policy, turns the GPU runtime limit into a restartable eviction instead of a hold.
 

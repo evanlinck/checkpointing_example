@@ -20,14 +20,14 @@ Job: `6586848.0`   Test dir: `/home/<user>/probes/runs/backfill2/chtc_backfill/P
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 753aaa4d | 11:22:00.2 | txie-dsigpu4000 | False | 0 | None (None) |  | [] | 0 |
+| 753aaa4d | 11:22:00.2 | <host-1> | False | 0 | None (None) |  | [] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 11:17:36.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc_backfill__P0-fingerprint"; JobBatchName = "probes.dag+6586847" ]
-- 11:21:56.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=txie-dsigpu4000.chtc.wisc.edu&noUDP&sock=backfill1_5_2080173_cf47_26348>
+- 11:21:56.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=backfill1_5_2080173_cf47_26348>
 - 11:21:59.0 `040 file_transfer` Finished transferring input files 
-- 11:21:59.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: backfill1_5@txie-dsigpu4000.chtc.wisc.edu; AvailableGPUs = { GPUs_GPU_aab08e20 }; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_1355525/scratch"; Cpus = 1; Disk = 2097152; GPUs = 1; GPUs_GPU_aab08e20 = [ Id = "GPU-aab08e20"; Capability = 9.0; DeviceName = "NVIDIA H100 80GB HBM3"; D
+- 11:21:59.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: backfill1_5@<host-1>; AvailableGPUs = { GPUs_GPU_aab08e20 }; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_1355525/scratch"; Cpus = 1; Disk = 2097152; GPUs = 1; GPUs_GPU_aab08e20 = [ Id = "GPU-aab08e20"; Capability = 9.0; DeviceName = "NVIDIA H100 80GB HBM3"; D
 - 11:22:00.0 `040 file_transfer` Started transferring output files 
 - 11:22:00.0 `040 file_transfer` Finished transferring output files 
 - 11:22:00.0 `005 terminated` Job terminated. — (1) Normal termination (return value 0); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 38844  -  Run Bytes Sent By Job; 286336878  -
@@ -43,7 +43,7 @@ ExitCode = 0
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = 1790958120
 JobCurrentStartTransferOutputDate = 1790958120
-LastRemoteHost = backfill1_5@txie-dsigpu4000.chtc.wisc.edu
+LastRemoteHost = backfill1_5@<host-1>
 LastRemoteWallClockTime = 4.0
 NumCkpts = 0
 NumCkpts_RAW = 0

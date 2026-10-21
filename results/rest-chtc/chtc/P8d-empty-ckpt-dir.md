@@ -17,17 +17,17 @@ Job: `6573402.0`   Test dir: `/home/<user>/probes/runs/rest-chtc/chtc/P8d-empty-
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| cc13f3f6 | 08:54:33.5 | e2481 | False | 0 | None (None) |  | [] | 85 |
-| dfe308c1 | 08:55:04.4 | e2481 | True | 0 | None (None) |  | [] | 85 |
-| 4ec15535 | 08:55:35.2 | e2481 | True | 0 | None (None) |  | [] | 85 |
-| 08f99767 | 08:56:06.3 | e2481 | True | 0 | None (None) |  | [(60, 'final', 0.012)] | 0 |
+| cc13f3f6 | 08:54:33.5 | <host-1> | False | 0 | None (None) |  | [] | 85 |
+| dfe308c1 | 08:55:04.4 | <host-1> | True | 0 | None (None) |  | [] | 85 |
+| 4ec15535 | 08:55:35.2 | <host-1> | True | 0 | None (None) |  | [] | 85 |
+| 08f99767 | 08:56:06.3 | <host-1> | True | 0 | None (None) |  | [(60, 'final', 0.012)] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 08:51:00.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc__P8d-empty-ckpt-dir"; JobBatchName = "probes.dag+6573176" ]
-- 08:51:12.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2481.chtc.wisc.edu&noUDP&sock=slot1_9_3564670_3d75_95265>
+- 08:51:12.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=slot1_9_3564670_3d75_95265>
 - 08:54:32.0 `040 file_transfer` Finished transferring input files 
-- 08:54:32.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_9@e2481.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_566305/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
+- 08:54:32.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_9@<host-1>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_566305/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
 - 08:55:03.0 `040 file_transfer` Started transferring output files 
 - 08:55:03.0 `040 file_transfer` Finished transferring output files 
 - 08:55:34.0 `040 file_transfer` Started transferring output files 
@@ -50,7 +50,7 @@ ExitCode = 0
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = 1790949426
 JobCurrentStartTransferOutputDate = 1790949426
-LastRemoteHost = slot1_9@e2481.chtc.wisc.edu
+LastRemoteHost = slot1_9@<host-1>
 LastRemoteWallClockTime = 354.0
 NumCkpts = 0
 NumCkpts_RAW = 0

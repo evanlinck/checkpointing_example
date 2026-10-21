@@ -19,15 +19,15 @@ Job: `6589683.0`   Test dir: `/home/<user>/probes/runs/ospool/ospool/P5a-bench`
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 9e887660 | 12:00:39.7 | c2023.swan.hcc.unl.edu | False | 0 | None (None) |  | [] | 0 |
+| 9e887660 | 12:00:39.7 | <host-1> | False | 0 | None (None) |  | [] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 11:58:01.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "ospool__P5a-bench"; JobBatchName = "probes.dag+6586482" ]
 - 12:00:33.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:45609?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[<ipv6>]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector6#14598670%2067.58.49.91:9618%3faddrs%3d67.58.49.91-9618+[<ipv6>]-9618%26
 - 12:00:39.0 `040 file_transfer` Finished transferring input files 
-- 12:00:39.0 `021 remote_error` Message from starter on slot1@glidein_1627526_182790606@c2023.swan.hcc.unl.edu: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
-- 12:00:39.0 `001 executing` Job executing on host: <<ip>:34483?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f — SlotName: slot1@glidein_1627526_182790606@c2023.swan.hcc.unl.edu; CondorScratchDir = "/scratch/glide_hCa8Tx/execute/dir_1905909/scratch"; Cpus = 1; Disk = 36610688; GPUs = 0; Memory = 2000
+- 12:00:39.0 `021 remote_error` Message from starter on slot1@glidein_1627526_182790606@<host-1>: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
+- 12:00:39.0 `001 executing` Job executing on host: <<ip>:34483?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f — SlotName: slot1@glidein_1627526_182790606@<host-1>; CondorScratchDir = "/scratch/glide_hCa8Tx/execute/dir_1905909/scratch"; Cpus = 1; Disk = 36610688; GPUs = 0; Memory = 2000
 - 12:00:43.0 `040 file_transfer` Started transferring output files 
 - 12:00:43.0 `040 file_transfer` Finished transferring output files 
 - 12:00:43.0 `005 terminated` Job terminated. — (1) Normal termination (return value 0); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 2449  -  Run Bytes Sent By Job; 286336878  - 
@@ -43,7 +43,7 @@ ExitCode = 0
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = 1790960443
 JobCurrentStartTransferOutputDate = 1790960442
-LastRemoteHost = slot1@glidein_1627526_182790606@c2023.swan.hcc.unl.edu
+LastRemoteHost = slot1@glidein_1627526_182790606@<host-1>
 LastRemoteWallClockTime = 11.0
 NumCkpts = 0
 NumCkpts_RAW = 0

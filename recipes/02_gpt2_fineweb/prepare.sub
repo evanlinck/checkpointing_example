@@ -1,0 +1,36 @@
+# Tokenize FineWeb-Edu sample-10BT once (a CPU job), writing ~20 GB of token shards
+# straight to /staging.
+# Submit with:  condor_submit prepare.sub      (first replace the <...> placeholders)
+# A quick test first, if you like: add --max-files 1 to the shell line (just the first input file) and a test --out-dir.
+#
+# The job needs no checkpointing setup of its own: prepare_data.py records each finished input file
+# in manifest.json on /staging, so if HTCondor evicts and restarts the job, it skips what's done.
+
+# --- What to run ---
+# `exec` makes Python the job's top process (it has nothing to save, but keep the habit).
+# `export HOME=$PWD`: the container is read-only; point $HOME at the job's own directory.
+shell                     = export HOME=$PWD; exec python3 prepare_data.py --out-dir /staging/<user>/fineweb10B --num-proc 15
+# HF_HOME: keep Hugging Face's caches and metadata in the job's directory, not in your home.
+environment               = "HF_HOME=hf_cache"
+transfer_input_files      = prepare_data.py
+# The shards are written to /staging, so the job must run where /staging is mounted.
+requirements              = (HasCHTCStaging =?= true)
+
+# --- Software ---
+# Recipe 1's image: it has tiktoken, datasets (which brings huggingface_hub and pyarrow) and numpy.
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe1.sif
+
+# --- Resources ---
+# Tokenizing is CPU-bound and runs in parallel: 15 tokenizer processes plus the main one.
+request_cpus              = 16
+# One batch of documents per process, plus one 200 MB shard being filled: a few GB at most.
+request_memory            = 16GB
+# The container, plus one downloaded input file at a time (a few GB at most); the shards go to /staging.
+request_disk              = 20GB
+
+# --- Logs ---
+log                       = prepare.log
+output                    = prepare.out
+error                     = prepare.err
+
+queue

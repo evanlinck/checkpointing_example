@@ -20,22 +20,22 @@ Job: `6527336.0`   Test dir: `runs/core-chtc/chtc/P3a-grace-default-vacate`
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 8ecc843f | 14:04:04.1 | e2464.chtc.wisc.edu | False | 0 | None (None) |  | [(5, 'voluntary', 0.012)] | 85 |
-| 7e4f7065 | 14:04:11.9 | e2464.chtc.wisc.edu | True | 0 | 5 (voluntary) | SIGTERM | [] | none (killed?) |
-| 58ebbb9b | 14:17:28.4 | e2016.chtc.wisc.edu | False | 1 | 5 (voluntary) |  | [] | 0 |
+| 8ecc843f | 14:04:04.1 | <host-1> | False | 0 | None (None) |  | [(5, 'voluntary', 0.012)] | 85 |
+| 7e4f7065 | 14:04:11.9 | <host-1> | True | 0 | 5 (voluntary) | SIGTERM | [] | none (killed?) |
+| 58ebbb9b | 14:17:28.4 | <host-2> | False | 1 | 5 (voluntary) |  | [] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 14:03:16.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "chtc__P3a-grace-default-vacate"; JobBatchName = "probes.dag+6527287" ]
-- 14:03:58.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2464.chtc.wisc.edu&noUDP&sock=slot1_44_1734380_5bf9_11158>
+- 14:03:58.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-1>&noUDP&sock=slot1_44_1734380_5bf9_11158>
 - 14:04:03.0 `040 file_transfer` Finished transferring input files 
-- 14:04:03.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_44@e2464.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_750650/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
+- 14:04:03.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e — SlotName: slot1_44@<host-1>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_750650/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
 - 14:04:10.0 `040 file_transfer` Started transferring output files 
 - 14:04:10.0 `040 file_transfer` Finished transferring output files 
 - 14:15:38.0 `004 evicted` Job was evicted. Code 1022 Subcode 0 — (0) CPU times; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; 1051315  -  Run Bytes Sent By Job; 286336878  -  Run Bytes Received By Job; Reason: Job vacated by schedd; Cpus                 :      0.00        1         1; Disk (KB)           
-- 14:16:53.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=e2016.chtc.wisc.edu&noUDP&sock=slot1_25_3486004_ed36_76134>
+- 14:16:53.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alias=<host-2>&noUDP&sock=slot1_25_3486004_ed36_76134>
 - 14:16:59.0 `040 file_transfer` Finished transferring input files 
-- 14:17:27.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_25@e2016.chtc.wisc.edu; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_4099844/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
+- 14:17:27.0 `001 executing` Job executing on host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&alia — SlotName: slot1_25@<host-2>; CondorScratchDir = "/var/lib/condor/execute/slot1/dir_4099844/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; IoHeavy = 0; Memory = 1024
 - 14:17:28.0 `040 file_transfer` Started transferring output files 
 - 14:17:28.0 `040 file_transfer` Finished transferring output files 
 - 14:17:29.0 `005 terminated` Job terminated. — (1) Normal termination (return value 0); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 1052404  -  Run Bytes Sent By Job; 287388225 
@@ -54,7 +54,7 @@ ExitSignal = 9
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = -1
 JobCurrentStartTransferOutputDate = 1790882248
-LastRemoteHost = slot1_25@e2016.chtc.wisc.edu
+LastRemoteHost = slot1_25@<host-2>
 LastRemoteWallClockTime = 36.0
 LastVacateTime = 1790882138
 NumCkpts = 0
@@ -93,12 +93,12 @@ WhenToTransferOutput = ON_EXIT
 14:04:09.9 8ecc843f exit                   {"code": 85, "reason": "voluntary exit at step 5", "step": 5}
 14:04:11.9 7e4f7065 start                  {"cwd": "/var/lib/condor/execute/slot1/dir_750650/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 1, "python": "3.12.14", "sandbox_created_by": "8ecc843f", "sandbox_marker_survived": true, "scratch_dir": "/var/lib/condor/execute/slot1/dir_750650/scratch"}
 14:04:11.9 7e4f7065 history_attached       {"ckpt_dir": "/var/lib/condor/execute/slot1/dir_750650/scratch/ckpt", "store": "spool"}
-14:04:11.9 7e4f7065 restore                {"chosen": "step_00000005", "ckpt_dir": "/var/lib/condor/execute/slot1/dir_750650/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790881449.8645725, "saved_by_exec": "8ecc843f", "saved_on_host": "e2464.chtc.wisc.edu", "saved_reason
+14:04:11.9 7e4f7065 restore                {"chosen": "step_00000005", "ckpt_dir": "/var/lib/condor/execute/slot1/dir_750650/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790881449.8645725, "saved_by_exec": "8ecc843f", "saved_on_host": "<host-1>", "saved_reason
 14:04:11.9 7e4f7065 loop_start             {"restored_step": 5, "step": 5, "total_steps": 3000, "voluntary_exit_at": [5]}
 14:05:38.6 7e4f7065 signal                 {"first": true, "on_sigterm": "ignore", "received_at": 1790881538.5189478, "role": "parent", "signal": "SIGTERM", "step": 70}
 14:17:28.4 58ebbb9b start                  {"cwd": "/var/lib/condor/execute/slot1/dir_4099844/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 0, "python": "3.12.14", "sandbox_created_by": "58ebbb9b", "sandbox_marker_survived": false, "scratch_dir": "/var/lib/condor/execute/slot1/dir_4099844/scratch"}
 14:17:28.4 58ebbb9b history_attached       {"ckpt_dir": "/var/lib/condor/execute/slot1/dir_4099844/scratch/ckpt", "store": "spool"}
-14:17:28.4 58ebbb9b restore                {"chosen": "step_00000005", "ckpt_dir": "/var/lib/condor/execute/slot1/dir_4099844/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790881449.8645725, "saved_by_exec": "8ecc843f", "saved_on_host": "e2464.chtc.wisc.edu", "saved_reaso
+14:17:28.4 58ebbb9b restore                {"chosen": "step_00000005", "ckpt_dir": "/var/lib/condor/execute/slot1/dir_4099844/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790881449.8645725, "saved_by_exec": "8ecc843f", "saved_on_host": "<host-1>", "saved_reaso
 14:17:28.4 58ebbb9b exit                   {"code": 0, "reason": "rescheduled (NumJobStarts=1, restored step 5, sandbox marker survived=False); --exit-on-restart", "step": 5}
 ```
 

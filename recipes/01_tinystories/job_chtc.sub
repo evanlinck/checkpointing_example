@@ -1,0 +1,65 @@
+# Recipe 1 on CHTC GPUs, spool mode: HTCondor keeps the checkpoint between runs.
+# Submit with:  condor_submit job_chtc.sub
+# Before submitting, copy the shared checkpointing modules next to this file:
+#   cp -r ../../htcondor_ckpt .
+
+# --- What to run ---
+# `exec` makes Python the job's top process, the one HTCondor sends SIGTERM to.
+# --resume auto: the same command for the first start and every restart.
+# max_runtime_seconds: the timed checkpoint (save + exit 85) every 6 hours. CHTC usually
+# suggests 6-10 hours on backfill and 4-6 hours on the OSPool. A vacate gets its own save,
+# so this interval only limits what a hard kill (no warning) can take.
+# `export HOME=$PWD`: the container is read-only, and torch.compile/Triton write caches
+# under $HOME, so point it at the job's own (writable) directory first.
+shell                     = export HOME=$PWD; exec python3 train.py --config config.yaml --resume auto --set max_runtime_seconds=21600
+# The code, the shared checkpointing modules (the htcondor_ckpt directory, copied here
+# from the repository root), and the data made by
+# prepare_data.py, fetched from /staging through OSDF.
+transfer_input_files      = train.py, model.py, config.yaml, htcondor_ckpt, osdf:///chtc/staging/<user>/tinystories/train.bin, osdf:///chtc/staging/<user>/tinystories/val.bin
+
+# --- Checkpointing ---
+# Exit 85 means "progress saved, restart me"; without this line it would mean "done".
+checkpoint_exit_code      = 85
+# What HTCondor keeps between runs: the resumable checkpoints, and outputs/ (best model,
+# sample stories, metrics log), so those continue across restarts too. Both directories
+# exist from the job's first second (train.py creates them); a missing one means a hold.
+transfer_checkpoint_files = checkpoints, outputs
+# Also keep them when the job is evicted (vacate, hold, backfill preemption): without this,
+# the save made after SIGTERM is thrown away.
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+# Directories are only copied back if named here (by default, only new top-level files are).
+transfer_output_files     = checkpoints, outputs
+# The signal train.py listens for.
+kill_sig                  = SIGTERM
+
+# --- Software ---
+# CUDA PyTorch + tiktoken etc. (container.def), on /staging, fetched through OSDF.
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe1.sif
+
+# --- GPU ---
+request_gpus              = 1
+# GPU memory (MB), not to be confused with request_memory (host RAM). This model at batch 64 x 512
+# runs out of memory on 11 GB GPUs (seen on an RTX 2080 Ti-class card); 20 GB leaves room.
+gpus_minimum_memory       = 20000
++WantGPULab               = true
+# CHTC GPU job lengths: short = 12 h, medium = 24 h, mediumlong = 72 h, long = 168 h.
++GPUJobLength             = "short"
+# Lets the job use backfill slots, and (per CHTC policy) turns reaching the job-length
+# limit into an eviction (save + restart) instead of a hold.
++is_resumable             = true
+# To run ONLY on backfill slots (reclaimed when their owners need them), uncomment:
+# requirements            = (TARGET.BackfillSlot =?= true)
+
+# --- Resources ---
+request_cpus              = 4
+request_memory            = 24GB
+request_disk              = 20GB
+
+# --- Logs ---
+# HTCondor's record of what happened to the job (started, evicted, file transfers):
+log                       = job.log
+# What train.py prints; appended across restarts:
+output                    = job.out
+error                     = job.err
+
+queue

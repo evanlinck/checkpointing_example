@@ -20,17 +20,17 @@ Job: `6588467.0`   Test dir: `/home/<user>/probes/runs/ospool/ospool/P2b-evict-t
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 8adce357 | 11:30:47.5 | gpu-node007 | False | 0 | None (None) |  | [(60, 'voluntary', 0.007)] | 85 |
-| 36d6d439 | 11:31:49.1 | gpu-node007 | True | 0 | 60 (voluntary) | SIGTERM | [(153, 'signal', 0.006)] | 85 |
-| f02efcce | 11:34:53.0 | a213.anvil.rcac.purdue.edu | False | 1 | 153 (signal) |  | [(420, 'final', 0.007)] | 0 |
+| 8adce357 | 11:30:47.5 | <host-1> | False | 0 | None (None) |  | [(60, 'voluntary', 0.007)] | 85 |
+| 36d6d439 | 11:31:49.1 | <host-1> | True | 0 | 60 (voluntary) | SIGTERM | [(153, 'signal', 0.006)] | 85 |
+| f02efcce | 11:34:53.0 | <host-2> | False | 1 | 153 (signal) |  | [(420, 'final', 0.007)] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 11:30:30.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "ospool__P2b-evict-transfer-hold-release"; JobBatchName = "probes.dag+6586482" ]
 - 11:30:40.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:44387?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[<ipv6>]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector1#14601818%2067.58.49.91:9618%3faddrs%3d67.58.49.91-9618+[<ipv6>]-9618%26al
 - 11:30:45.0 `040 file_transfer` Finished transferring input files 
-- 11:30:46.0 `021 remote_error` Message from starter on slot1_2@glidein_274178_123184125@gpu-node007: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
-- 11:30:46.0 `001 executing` Job executing on host: <<ip>:44119?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_2@glidein_274178_123184125@gpu-node007; AvailableGPUs = {  }; CondorScratchDir = "/local/scratch/glide_7p1DYF/execute/dir_1952987/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
+- 11:30:46.0 `021 remote_error` Message from starter on slot1_2@glidein_274178_123184125@<host-1>: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
+- 11:30:46.0 `001 executing` Job executing on host: <<ip>:44119?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_2@glidein_274178_123184125@<host-1>; AvailableGPUs = {  }; CondorScratchDir = "/local/scratch/glide_7p1DYF/execute/dir_1952987/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
 - 11:31:47.0 `040 file_transfer` Started transferring output files 
 - 11:31:48.0 `040 file_transfer` Finished transferring output files 
 - 11:33:22.0 `040 file_transfer` Started transferring output files 
@@ -40,8 +40,8 @@ Job: `6588467.0`   Test dir: `/home/<user>/probes/runs/ospool/ospool/P2b-evict-t
 - 11:34:06.0 `013 released` Job was released. — via condor_release (by user <user>)
 - 11:34:48.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:39399?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[<ipv6>]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector5#14599462%2067.58.49.91:9618%3faddrs%3d67.58.49.91-9618+[<ipv6>]-9618%2
 - 11:34:51.0 `040 file_transfer` Finished transferring input files 
-- 11:34:52.0 `021 remote_error` Message from starter on slot1_38@glidein_79141_540569430@a213.anvil.rcac.purdue.edu: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
-- 11:34:52.0 `001 executing` Job executing on host: <<ip>:38025?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2 — SlotName: slot1_38@glidein_79141_540569430@a213.anvil.rcac.purdue.edu; CondorScratchDir = "/tmp/glide_Y7BbYf/execute/dir_2327211/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
+- 11:34:52.0 `021 remote_error` Message from starter on slot1_38@glidein_79141_540569430@<host-2>: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
+- 11:34:52.0 `001 executing` Job executing on host: <<ip>:38025?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2 — SlotName: slot1_38@glidein_79141_540569430@<host-2>; CondorScratchDir = "/tmp/glide_Y7BbYf/execute/dir_2327211/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
 - 11:39:21.0 `040 file_transfer` Started transferring output files 
 - 11:39:21.0 `040 file_transfer` Finished transferring output files 
 - 11:39:22.0 `005 terminated` Job terminated. — (1) Normal termination (return value 0); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 27254  -  Run Bytes Sent By Job; 288441130  -
@@ -61,7 +61,7 @@ JobCurrentStartTransferOutputDate = 1790959161
 LastHoldReason = via condor_hold (by user <user>)
 LastHoldReasonCode = 1
 LastHoldReasonSubCode = 0
-LastRemoteHost = slot1_38@glidein_79141_540569430@a213.anvil.rcac.purdue.edu
+LastRemoteHost = slot1_38@glidein_79141_540569430@<host-2>
 LastRemoteWallClockTime = 275.0
 LastVacateTime = 1790958802
 NumCkpts = 0
@@ -102,7 +102,7 @@ WhenToTransferOutput = ON_EXIT_OR_EVICT
 11:31:47.7 8adce357 exit                   {"code": 85, "reason": "voluntary exit at step 60", "step": 60}
 11:31:49.1 36d6d439 start                  {"cwd": "/srv/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 1, "python": "3.12.14", "sandbox_created_by": "8adce357", "sandbox_marker_survived": true, "scratch_dir": "/srv/scratch"}
 11:31:49.1 36d6d439 history_attached       {"ckpt_dir": "/srv/scratch/ckpt", "store": "spool"}
-11:31:49.1 36d6d439 restore                {"chosen": "step_00000060", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000060", "nested_dir_ok": true, "saved_at": 1790958707.6625397, "saved_by_exec": "8adce357", "saved_on_host": "gpu-node007", "saved_reason": "voluntary", "step": 60}
+11:31:49.1 36d6d439 restore                {"chosen": "step_00000060", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000060", "nested_dir_ok": true, "saved_at": 1790958707.6625397, "saved_by_exec": "8adce357", "saved_on_host": "<host-1>", "saved_reason": "voluntary", "step": 60}
 11:31:49.1 36d6d439 loop_start             {"restored_step": 60, "step": 60, "total_steps": 420, "voluntary_exit_at": [60]}
 11:33:22.1 36d6d439 signal                 {"first": true, "on_sigterm": "save85", "received_at": 1790958802.05154, "role": "parent", "signal": "SIGTERM", "step": 152}
 11:33:22.2 36d6d439 save_start             {"ckpt_files": 1, "ckpt_mb": 1, "reason": "signal", "step": 153}
@@ -112,7 +112,7 @@ WhenToTransferOutput = ON_EXIT_OR_EVICT
 11:33:22.2 36d6d439 exit                   {"code": 85, "reason": "signal SIGTERM, on_sigterm=save85", "step": 153}
 11:34:53.0 f02efcce start                  {"cwd": "/srv/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 0, "python": "3.12.14", "sandbox_created_by": "f02efcce", "sandbox_marker_survived": false, "scratch_dir": "/srv/scratch"}
 11:34:53.0 f02efcce history_attached       {"ckpt_dir": "/srv/scratch/ckpt", "store": "spool"}
-11:34:53.0 f02efcce restore                {"chosen": "step_00000153", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000153", "nested_dir_ok": true, "saved_at": 1790958802.193609, "saved_by_exec": "36d6d439", "saved_on_host": "gpu-node007", "saved_reason": "signal", "step": 153}
+11:34:53.0 f02efcce restore                {"chosen": "step_00000153", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000153", "nested_dir_ok": true, "saved_at": 1790958802.193609, "saved_by_exec": "36d6d439", "saved_on_host": "<host-1>", "saved_reason": "signal", "step": 153}
 11:34:53.0 f02efcce loop_start             {"restored_step": 153, "step": 153, "total_steps": 420, "voluntary_exit_at": [60]}
 11:39:21.3 f02efcce save_start             {"ckpt_files": 1, "ckpt_mb": 1, "reason": "final", "step": 420}
 11:39:21.3 f02efcce save_done              {"bytes": 1048576, "dir_fsync_ok": true, "reason": "final", "seconds": 0.007, "step": 420, "write_seconds": 0.006}

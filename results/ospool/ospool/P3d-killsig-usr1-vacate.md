@@ -20,24 +20,24 @@ Job: `6589424.0`   Test dir: `/home/<user>/probes/runs/ospool/ospool/P3d-killsig
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 948071eb | 11:56:55.4 | mwt2-c166.campuscluster.illinois.edu | False | 0 | None (None) |  | [(5, 'voluntary', 0.049)] | 85 |
-| 82adecec | 11:57:02.1 | mwt2-c166.campuscluster.illinois.edu | True | 0 | 5 (voluntary) | SIGUSR1 | [] | none (killed?) |
-| a3d31c6c | 12:09:56.5 | gpu-node007 | False | 1 | 5 (voluntary) |  | [] | 0 |
+| 948071eb | 11:56:55.4 | <host-1> | False | 0 | None (None) |  | [(5, 'voluntary', 0.049)] | 85 |
+| 82adecec | 11:57:02.1 | <host-1> | True | 0 | 5 (voluntary) | SIGUSR1 | [] | none (killed?) |
+| a3d31c6c | 12:09:56.5 | <host-2> | False | 1 | 5 (voluntary) |  | [] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 11:55:31.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "ospool__P3d-killsig-usr1-vacate"; JobBatchName = "probes.dag+6586482" ]
 - 11:56:50.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:43167?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[<ipv6>]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector1#14602636%2067.58.49.91:9618%3faddrs%3d67.58.49.91-9618+[<ipv6>]-9618
 - 11:56:53.0 `040 file_transfer` Finished transferring input files 
-- 11:56:54.0 `021 remote_error` Message from starter on slot1_5@glidein_2642342_542725722@mwt2-c166.campuscluster.illinois.edu: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
-- 11:56:54.0 `001 executing` Job executing on host: <<ip>:37579?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93 — SlotName: slot1_5@glidein_2642342_542725722@mwt2-c166.campuscluster.illinois.edu; CondorScratchDir = "/scratch.local/condor/execute/dir_2642340/glide_Jbf56e/execute/dir_4188992/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
+- 11:56:54.0 `021 remote_error` Message from starter on slot1_5@glidein_2642342_542725722@<host-1>: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
+- 11:56:54.0 `001 executing` Job executing on host: <<ip>:37579?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93 — SlotName: slot1_5@glidein_2642342_542725722@<host-1>; CondorScratchDir = "/scratch.local/condor/execute/dir_2642340/glide_Jbf56e/execute/dir_4188992/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
 - 11:57:00.0 `040 file_transfer` Started transferring output files 
 - 11:57:00.0 `040 file_transfer` Finished transferring output files 
 - 12:08:39.0 `004 evicted` Job was evicted. Code 1022 Subcode 0 — (0) CPU times; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; 1051451  -  Run Bytes Sent By Job; 286336878  -  Run Bytes Received By Job; Reason: Job vacated by schedd; Cpus                 :      0.00        1         1; Disk (KB)           
 - 12:09:46.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:41759?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[<ipv6>]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector3#14596961%2067.58.49.91:9618%3faddrs%3d67.58.49.91-9618+[<ipv6>]-9618%26al
 - 12:09:54.0 `040 file_transfer` Finished transferring input files 
-- 12:09:55.0 `021 remote_error` Message from starter on slot1_2@glidein_274178_123184125@gpu-node007: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
-- 12:09:55.0 `001 executing` Job executing on host: <<ip>:44119?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_2@glidein_274178_123184125@gpu-node007; AvailableGPUs = {  }; CondorScratchDir = "/local/scratch/glide_7p1DYF/execute/dir_2009471/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
+- 12:09:55.0 `021 remote_error` Message from starter on slot1_2@glidein_274178_123184125@<host-2>: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
+- 12:09:55.0 `001 executing` Job executing on host: <<ip>:44119?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_2@glidein_274178_123184125@<host-2>; AvailableGPUs = {  }; CondorScratchDir = "/local/scratch/glide_7p1DYF/execute/dir_2009471/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
 - 12:09:56.0 `040 file_transfer` Started transferring output files 
 - 12:09:57.0 `040 file_transfer` Finished transferring output files 
 - 12:09:57.0 `005 terminated` Job terminated. — (1) Normal termination (return value 0); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 1052455  -  Run Bytes Sent By Job; 287388361 
@@ -57,7 +57,7 @@ ExitStatus = 0
 JobCurrentFinishTransferOutputDate = 1790960997
 JobCurrentStartTransferOutputDate = 1790960996
 KillSig = SIGUSR1
-LastRemoteHost = slot1_2@glidein_274178_123184125@gpu-node007
+LastRemoteHost = slot1_2@glidein_274178_123184125@<host-2>
 LastRemoteWallClockTime = 12.0
 LastVacateTime = 1790960919
 NumCkpts = 0
@@ -96,12 +96,12 @@ WhenToTransferOutput = ON_EXIT
 11:57:00.6 948071eb exit                   {"code": 85, "reason": "voluntary exit at step 5", "step": 5}
 11:57:02.1 82adecec start                  {"cwd": "/srv/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 1, "python": "3.12.14", "sandbox_created_by": "948071eb", "sandbox_marker_survived": true, "scratch_dir": "/srv/scratch"}
 11:57:02.1 82adecec history_attached       {"ckpt_dir": "/srv/scratch/ckpt", "store": "spool"}
-11:57:02.1 82adecec restore                {"chosen": "step_00000005", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790960220.5408814, "saved_by_exec": "948071eb", "saved_on_host": "mwt2-c166.campuscluster.illinois.edu", "saved_reason": "voluntary", "st
+11:57:02.1 82adecec restore                {"chosen": "step_00000005", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790960220.5408814, "saved_by_exec": "948071eb", "saved_on_host": "<host-1>", "saved_reason": "voluntary", "st
 11:57:02.1 82adecec loop_start             {"restored_step": 5, "step": 5, "total_steps": 3000, "voluntary_exit_at": [5]}
 11:58:38.8 82adecec signal                 {"first": true, "on_sigterm": "ignore", "received_at": 1790960318.7566857, "role": "parent", "signal": "SIGUSR1", "step": 99}
 12:09:56.5 a3d31c6c start                  {"cwd": "/srv/scratch", "mode": "run", "ppid": 1, "previous_starts_in_sandbox": 0, "python": "3.12.14", "sandbox_created_by": "a3d31c6c", "sandbox_marker_survived": false, "scratch_dir": "/srv/scratch"}
 12:09:56.5 a3d31c6c history_attached       {"ckpt_dir": "/srv/scratch/ckpt", "store": "spool"}
-12:09:56.5 a3d31c6c restore                {"chosen": "step_00000005", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790960220.5408814, "saved_by_exec": "948071eb", "saved_on_host": "mwt2-c166.campuscluster.illinois.edu", "saved_reason": "voluntary", "st
+12:09:56.5 a3d31c6c restore                {"chosen": "step_00000005", "ckpt_dir": "/srv/scratch/ckpt", "exists": true, "found": true, "latest_pointer": "step_00000005", "nested_dir_ok": true, "saved_at": 1790960220.5408814, "saved_by_exec": "948071eb", "saved_on_host": "<host-1>", "saved_reason": "voluntary", "st
 12:09:56.5 a3d31c6c exit                   {"code": 0, "reason": "rescheduled (NumJobStarts=1, restored step 5, sandbox marker survived=False); --exit-on-restart", "step": 5}
 ```
 

@@ -17,18 +17,18 @@ Job: `6587960.0`   Test dir: `/home/<user>/probes/runs/ospool/ospool/P8d-empty-c
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 97ead266 | 11:28:02.1 | dwarf33 | False | 0 | None (None) |  | [] | 85 |
-| 5db6f69e | 11:28:34.3 | dwarf33 | True | 0 | None (None) |  | [] | 85 |
-| 8c9dee10 | 11:29:06.1 | dwarf33 | True | 0 | None (None) |  | [] | 85 |
-| 5578d54a | 11:29:38.3 | dwarf33 | True | 0 | None (None) |  | [(60, 'final', 0.118)] | 0 |
+| 97ead266 | 11:28:02.1 | <host-1> | False | 0 | None (None) |  | [] | 85 |
+| 5db6f69e | 11:28:34.3 | <host-1> | True | 0 | None (None) |  | [] | 85 |
+| 8c9dee10 | 11:29:06.1 | <host-1> | True | 0 | None (None) |  | [] | 85 |
+| 5578d54a | 11:29:38.3 | <host-1> | True | 0 | None (None) |  | [(60, 'final', 0.118)] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 11:27:14.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "ospool__P8d-empty-ckpt-dir"; JobBatchName = "probes.dag+6586482" ]
 - 11:27:21.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:33989?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[<ipv6>]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector4#14594246%2067.58.49.91:9618%3faddrs%3d67.58.49.91-9618+[<ipv6>]-9618%26al
 - 11:28:00.0 `040 file_transfer` Finished transferring input files 
-- 11:28:00.0 `021 remote_error` Message from starter on slot1_1@glidein_3478735_241008756@dwarf33.beocat.ksu.edu: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
-- 11:28:00.0 `001 executing` Job executing on host: <<ip>:39599?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_1@glidein_3478735_241008756@dwarf33.beocat.ksu.edu; CondorScratchDir = "/tmp/glide_QV501P/execute/dir_1294066/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
+- 11:28:00.0 `021 remote_error` Message from starter on slot1_1@glidein_3478735_241008756@<host-1>: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
+- 11:28:00.0 `001 executing` Job executing on host: <<ip>:39599?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2f59 — SlotName: slot1_1@glidein_3478735_241008756@<host-1>; CondorScratchDir = "/tmp/glide_QV501P/execute/dir_1294066/scratch"; Cpus = 1; Disk = 2097152; GPUs = 0; Memory = 1024
 - 11:28:32.0 `040 file_transfer` Started transferring output files 
 - 11:28:32.0 `040 file_transfer` Finished transferring output files 
 - 11:29:04.0 `040 file_transfer` Started transferring output files 
@@ -51,7 +51,7 @@ ExitCode = 0
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = 1790958639
 JobCurrentStartTransferOutputDate = 1790958638
-LastRemoteHost = slot1_1@glidein_3478735_241008756@dwarf33.beocat.ksu.edu
+LastRemoteHost = slot1_1@glidein_3478735_241008756@<host-1>
 LastRemoteWallClockTime = 198.0
 NumCkpts = 0
 NumCkpts_RAW = 0

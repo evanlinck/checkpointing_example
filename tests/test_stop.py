@@ -114,3 +114,19 @@ def test_arithmetic(expr, value):
 @pytest.mark.parametrize("expr", ["JobRuntimeGuarantee", "__import__('os')", "1 / 0", "true", ""])
 def test_arithmetic_rejects(expr):
     assert stop._arithmetic(expr) is None
+
+
+def test_eviction_replaces_a_pending_timed_stop(tmp_path):
+    """A job waiting for the end of an epoch before its timed checkpoint must still
+    notice HTCondor's SIGTERM (and its deadline)."""
+    clock = Clock()
+    f = tmp_path / "STOP"
+    p = policy(max_runtime_seconds=60, stop_file=str(f), clock=clock)
+    clock.t += 61
+    assert p.should_stop() and p.reason == "timed" and not p.evicting()
+    clock.t += 30
+    p._on_signal(signal.SIGTERM, None)
+    assert p.reason == "signal" and p.evicting() and p.seconds_left() == pytest.approx(600)
+    f.write_text("")                      # a later stop file doesn't replace the signal
+    p.should_stop()
+    assert p.reason == "signal"

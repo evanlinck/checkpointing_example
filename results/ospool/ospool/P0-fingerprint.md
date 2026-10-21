@@ -20,15 +20,15 @@ Job: `6586483.0`   Test dir: `/home/<user>/probes/runs/ospool/ospool/P0-fingerpr
 
 | exec | start | host | sandbox kept | NumJobStarts | restored | signal | saves (step, reason, s) | exit |
 |---|---|---|---|---|---|---|---|---|
-| 23769844 | 11:15:50.5 | wsu-lc02.osris.org | False | 0 | None (None) |  | [] | 0 |
+| 23769844 | 11:15:50.5 | <host-1> | False | 0 | None (None) |  | [] | 0 |
 
 ## HTCondor event log (AP clock)
 
 - 11:13:37.0 `000 submitted` Job submitted from host: <<ip>:9618?addrs=<ip>-9618+[<ipv6>]-9618&al — [ DAGNodeName = "ospool__P0-fingerprint"; JobBatchName = "probes.dag+6586482" ]
 - 11:15:45.0 `040 file_transfer` Started transferring input files — Transferring to host: <<ip>:46463?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[<ipv6>]-9618%26alias%3dospool-ccb.osg.chtc.io%26noUDP%26sock%3dcollector1#14601177%2067.58.49.91:9618%3faddrs%3d67.58.49.91-9618+[<ipv6>]-9618%2
 - 11:15:48.0 `040 file_transfer` Finished transferring input files 
-- 11:15:49.0 `021 remote_error` Message from starter on slot1@glidein_865012_304242041@wsu-lc02.osris.org: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
-- 11:15:49.0 `001 executing` Job executing on host: <<ip>:40059?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2 — SlotName: slot1@glidein_865012_304242041@wsu-lc02.osris.org; CondorScratchDir = "/scratch/glide_D5wKd8/execute/dir_1900683/scratch"; Cpus = 1; Disk = 25637737; GPUs = 0; Memory = 2048
+- 11:15:49.0 `021 remote_error` Message from starter on slot1@glidein_865012_304242041@<host-1>: — PREPARE_JOB (prepare-hook) succeeded (reported status 000): Using Singularity image python312.sif
+- 11:15:49.0 `001 executing` Job executing on host: <<ip>:40059?CCBID=<ip>:9618%3faddrs%3d128.105.82.148-9618+[2607-f388-2200-93-2 — SlotName: slot1@glidein_865012_304242041@<host-1>; CondorScratchDir = "/scratch/glide_D5wKd8/execute/dir_1900683/scratch"; Cpus = 1; Disk = 25637737; GPUs = 0; Memory = 2048
 - 11:15:51.0 `040 file_transfer` Started transferring output files 
 - 11:15:51.0 `040 file_transfer` Finished transferring output files 
 - 11:15:51.0 `005 terminated` Job terminated. — (1) Normal termination (return value 0); Usr 0 00:00:00, Sys 0 00:00:00  -  Run Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Remote Usage; Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage; 55386  -  Run Bytes Sent By Job; 286336878  -
@@ -44,7 +44,7 @@ ExitCode = 0
 ExitStatus = 0
 JobCurrentFinishTransferOutputDate = 1790957751
 JobCurrentStartTransferOutputDate = 1790957751
-LastRemoteHost = slot1@glidein_865012_304242041@wsu-lc02.osris.org
+LastRemoteHost = slot1@glidein_865012_304242041@<host-1>
 LastRemoteWallClockTime = 8.0
 NumCkpts = 0
 NumCkpts_RAW = 0

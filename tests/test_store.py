@@ -87,3 +87,83 @@ def test_resave_same_step_replaces(tmp_path):
 def test_keep_must_be_positive(tmp_path):
     with pytest.raises(ValueError):
         CheckpointStore(str(tmp_path), keep=0)
+
+
+# ------------------------------------------------------------- several stores and backups
+from htcondor_ckpt.store import backup, backup_due, load_newest, newest  # noqa: E402
+
+
+def test_newest_across_stores_prefers_higher_step_then_first_store(tmp_path):
+    local = CheckpointStore(str(tmp_path / "local"), keep=1)
+    staging = CheckpointStore(str(tmp_path / "staging"), keep=2)
+    staging.save(100, write_text("backup-100"))
+    local.save(250, write_text("local-250"))
+    store, path = newest([local, staging])
+    assert store is local and path.endswith("step_00000250")
+    staging.save(250, write_text("backup-250"))            # same step in both: local wins
+    assert newest([local, staging])[0] is local
+    assert newest([CheckpointStore(str(tmp_path / "empty"))]) == (None, None)
+
+
+def test_load_newest_falls_back_across_stores(tmp_path, capsys):
+    local = CheckpointStore(str(tmp_path / "local"), keep=1)
+    staging = CheckpointStore(str(tmp_path / "staging"), keep=2)
+    staging.save(100, write_text("good"))
+    local.save(250, write_text("corrupt"))
+
+    def strict(d):
+        if read_text(d) == "corrupt":
+            raise ValueError("damaged")
+        return read_text(d)
+
+    path, value = load_newest([local, staging], strict)
+    assert value == "good" and path.endswith("step_00000100")
+    assert "WARNING" in capsys.readouterr().err
+
+
+def test_resubmitted_job_resumes_from_backup(tmp_path):
+    """After condor_rm + resubmit there is no spool: the new sandbox's store is empty."""
+    staging = CheckpointStore(str(tmp_path / "staging"), keep=2)
+    old_local = CheckpointStore(str(tmp_path / "old_sandbox"), keep=1)
+    info = old_local.save(300, write_text("state-300"), {"reason": "timed"})
+    backup(info["path"], staging)
+    new_local = CheckpointStore(str(tmp_path / "new_sandbox"), keep=1)
+    path, value = load_newest([new_local, staging], read_text)
+    assert value == "state-300" and path.startswith(str(tmp_path / "staging"))
+
+
+def test_backup_copies_files_and_metadata(tmp_path):
+    local = CheckpointStore(str(tmp_path / "local"), keep=1)
+    staging = CheckpointStore(str(tmp_path / "staging"), keep=2)
+
+    def write_nested(d):
+        os.makedirs(os.path.join(d, "shards"))
+        with open(os.path.join(d, "shards", "rank0.bin"), "wb") as f:
+            f.write(b"x" * 100)
+        write_text("main")(d)
+
+    info = local.save(42, write_nested, {"reason": "timed", "config_hash": "abc"})
+    b = backup(info["path"], staging)
+    assert read_text(b["path"]) == "main"
+    assert os.path.getsize(os.path.join(b["path"], "shards", "rank0.bin")) == 100
+    meta = staging.metadata(b["path"])
+    assert meta["step"] == 42 and meta["reason"] == "timed" and meta["config_hash"] == "abc"
+    assert meta["backup_of"] == info["path"]
+
+
+def test_backup_retention(tmp_path):
+    local = CheckpointStore(str(tmp_path / "local"), keep=1)
+    staging = CheckpointStore(str(tmp_path / "staging"), keep=2)
+    for step in (1, 2, 3):
+        backup(local.save(step, write_text(str(step)))["path"], staging)
+    assert [s for s, _ in staging.complete()] == [2, 3]
+
+
+def test_backup_due_uses_saved_time_not_memory(tmp_path):
+    local = CheckpointStore(str(tmp_path / "local"), keep=1)
+    staging = CheckpointStore(str(tmp_path / "staging"), keep=2)
+    assert backup_due(staging, 3600)                         # no backup yet
+    backup(local.save(1, write_text("1"))["path"], staging)
+    saved_at = staging.metadata(staging.latest())["saved_at"]
+    assert not backup_due(staging, 3600, now=saved_at + 600)
+    assert backup_due(staging, 3600, now=saved_at + 3600)
