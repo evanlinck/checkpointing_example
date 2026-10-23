@@ -109,7 +109,7 @@ PyTorch specifics:
 
 The job exits with **85** ("state saved, restart me") on two equal, first-class triggers, through one code path (`should_stop()` → save → exit 85):
 
-- **Timed exit** (`max_runtime_seconds`). Defaults follow CHTC's guidance, not the HTCondor manual's generic "about once an hour": **4–6 h on the OSPool (up to 8)** and **6–10 h on CHTC backfill**. A vacate with SIGTERM gets its own save, so the timed interval only bounds what a hard kill can take; weigh it against the cost of one timed checkpoint (save + transfer + restart/restore). This is CHTC's documented pattern. It is cheap, because the restart is usually in place. It is also the only protection against hard kills and OSPool glidein ends. In spool mode it is also *the* periodic checkpoint: a save that stays in scratch is lost on a hard kill. Exception: recipe 2 uses a **2 h demonstration interval**, so that its full run (only hours on H200s) crosses several timed exits. It says so wherever the value appears, next to the real guidance above.
+- **Timed exit** (`max_runtime_seconds`). Defaults follow CHTC's guidance, not the HTCondor manual's generic "about once an hour": **4–6 h on the OSPool (up to 8)** and **6–10 h on CHTC backfill**. A vacate with SIGTERM gets its own save, so the timed interval only bounds what a hard kill can take; weigh it against the cost of one timed checkpoint (save + transfer + restart/restore). This is CHTC's documented pattern. It is cheap, because the restart is usually in place. It is also the only protection against hard kills and OSPool glidein ends. In spool mode it is also *the* periodic checkpoint: a save that stays in scratch is lost on a hard kill. Exception: recipe 2 uses a **1 h demonstration interval**, so that its full run (~3.7 h on 4 A100s) crosses several timed exits. It says so wherever the value appears, next to the real guidance above.
 - **Eviction** (SIGTERM from a vacate, a hold, backfill preemption, or reaching the GPU runtime limit with `+is_resumable`). See section 3.
 
 Also:
@@ -221,4 +221,13 @@ Each recipe must pass:
    - **Backups that outlive the job, and how often to make them** (the table in `htcondor_ckpt/README.md`).
    - **`condor_chirp`:** what it is, when it helps (progress visible in `condor_q`), and when not to use it.
    - **Debugging a checkpoint:** vacate → hold → `condor_evicted_files get` → inspect → release (from the manual). `condor_ssh_to_job` for CPU jobs only; it's off for GPU jobs on CHTC.
+   - **Collected notes:** advice already drafted for users, with its evidence, lives in `docs/guidance-notes.md` (e.g. resuming on a different GPU type). Add to it as recipes teach us things users should know.
+   - **Multi-GPU jobs on a mixed pool:** users submit to the pool, never to specific machines, so a job must work on any machine its requirements match.
+     - **Describe hardware by its properties:** `gpus_minimum_memory` (with its unit, e.g. `30000M`), `gpus_minimum_capability` / `gpus_maximum_capability`, `require_gpus`.
+     - **Pitfalls by machine type:**
+       - NCCL hangs at the first collective on *some* PCIe-only machines (recipe 2: direct PCIe copies hung on RTX PRO 6000 machines but worked on L40; `NCCL_P2P_LEVEL=NVL` fixed it on an RTX PRO 6000 machine, and may cost speed where direct copies work);
+       - images without kernels for Blackwell (sm_120, needs CUDA 12.8+ PyTorch builds) fail with "no kernel image is available";
+       - slower scaling without NVLink;
+       - `/dev/shm` limits in containers.
+     - **Defenses in the job:** a short collective timeout and a start-up communication check, so a bad machine fails in minutes with a clear message.
    - **Patterns from the manual we don't use, and why:** periodic checkpoint signals (`+WantCheckpointSignal`; the interval is set by the pool, not the job); "delayed transfers" (`ON_EXIT_OR_EVICT` *without* `checkpoint_exit_code`, which recovers only from evictions); "early checkpoint exits" with `OnExitRemove` (for short-runtime pools).

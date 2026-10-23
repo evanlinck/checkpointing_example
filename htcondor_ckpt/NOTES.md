@@ -26,6 +26,11 @@ Things we've learned, or still need to learn, that could change the interface. A
   - `shell = exec python3 ...` delivers SIGTERM to Python.
 - **Lesson from recipe 1's first HTCondor runs:** create every directory named in `transfer_output_files` as the very first thing the job does. A crash before they existed (e.g. a bad data path) turned into a hold for "No such file or directory" on output transfer, hiding the real error. `CheckpointStore` already creates its directory in `__init__`, but recipes should create both their checkpoint and output directories before loading data or building models.
 
+- **Lessons from writing recipe 2 (DDP):**
+  - `capture_rng()` read every visible GPU's generator (`get_rng_state_all()`). Under torchrun each worker sees all of the job's GPUs, so that would start a CUDA context on every GPU from every worker. It now takes `all_devices=False` for one-process-per-GPU runs; `restore_rng()` handles both, and checkpoints written before the option.
+  - `agree(flag)` says *whether* to stop, not *why*. `agree_max(level)` carries the most urgent action any rank asked for (go on < periodic save < timed stop < stop file < signal), so every rank saves and logs the same reason with one all-reduce.
+  - Under torchrun, a worker that exits while rank 0 is still saving makes torchrun stop the other workers, rank 0 included. So every rank waits at a barrier after the save, then all exit 85 together. (From torchrun's documented behaviour, not yet measured: `test_local.py --ddp` and the HTCondor tests will show it.)
+
 ## Later
 
 - **`condor_chirp` support** (progress reporting only; the HTCondor manual advises against using chirp to move checkpoints): an optional `chirp.py` for low-frequency progress reporting, e.g. setting `LastCheckpointStep` once per checkpoint. First test whether chirp works inside a container via the `htcondor` Python bindings or `htchirp`, on CHTC and the OSPool. See CLAUDE.md.

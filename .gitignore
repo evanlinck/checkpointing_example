@@ -22,6 +22,9 @@ prepare.err
 job.log
 job.out
 job.err
+job_*.log
+job_*.out
+job_*.err
 test_*_[0-9]*.log
 test_*_[0-9]*.out
 test_*_[0-9]*.err
@@ -37,9 +40,13 @@ results/**
 !results/**/
 !results/**/*.md
 result_*.txt
+*_run.txt
 
 # Editor tooling bookkeeping
 .cc-writes/
 
 # Copies of the shared modules placed next to a recipe for job submission
 recipes/*/htcondor_ckpt/
+
+# Result files downloaded into a recipe directory for analysis
+recipes/*/results/

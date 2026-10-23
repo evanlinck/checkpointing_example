@@ -55,7 +55,11 @@ def main():
         ax.axvline(s, color="#fd8d3c", ls="--", lw=1, label="restart (after a save)" if i == 0 else None)
     ax.set_xlabel("step")
     ax.set_ylabel("loss")
-    ax.set_ylim(min(losses + [val[s] for s in vs]) * 0.95, min(max(losses), 4.0))
+    # Leave out the first few percent of steps when scaling the axis: the loss starts very high
+    # (~11 for a fresh GPT-2) and would flatten everything after it.
+    rest = losses[len(losses) // 20:] or losses
+    low = min(rest + [val[s] for s in vs])
+    ax.set_ylim(low - 0.05 * abs(low), max(rest) * 1.1)
     ax.set_title("%s: %d steps, %d restarts, final val loss %s"
                  % (args.title, max(steps + vs), len(resumes), "%.4f" % val[vs[-1]] if vs else "-"))
     ax.legend(fontsize=8)

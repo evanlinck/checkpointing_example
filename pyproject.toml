@@ -8,7 +8,14 @@ description = "Checkpointing recipes for AI training jobs on HTCondor (CHTC and 
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = [
+    "numpy>=2.0.2",
+    "pyyaml>=6.0.3",
+    "torch>=2.8.0",
+    # torchrun (torch.distributed.run) imports this backport on Python < 3.10, but torch
+    # doesn't declare it. Needed for recipe 2's `test_local.py --ddp`.
+    "importlib-metadata; python_version < '3.10'",
+]
 
 [dependency-groups]
 dev = ["pytest"]
