@@ -1,0 +1,20 @@
+# spool_check.sub - a tiny self-checkpointing job for ap_survey.sh --job (any access point, no container).
+#   condor_submit spool_check.sub
+#   (after a few minutes, while it runs)  ../ap_survey.sh --job <cluster>.0 --history-days 0
+# The checkpoint directory grows by 1 MB per execution (10 MB at most); it is spooled on the
+# access point between executions, which is what --job inspects.
+executable                = spool_check.sh
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+transfer_output_files     = ckpt
+kill_sig                  = SIGTERM
+# OSPool access points require a duration category for self-checkpointing jobs.
++JobDurationCategory      = "Medium"
+request_cpus              = 1
+request_memory            = 256MB
+request_disk              = 100MB
+log                       = spool_check.log
+output                    = spool_check.out
+error                     = spool_check.err
+queue

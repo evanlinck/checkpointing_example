@@ -1,0 +1,18 @@
+# P11d - Does the input-size limit count a checkpoint restored on a new host?
+# @question: With max_transfer_input_mb = 50, a 100 MB spooled checkpoint, and a vacate that forces a restart in a new sandbox: is the restart held for exceeding the input limit (so a checkpoint counts as input), or does it resume? (OSPool access points such as ap40 set MAX_TRANSFER_INPUT_MB = 5000 and don't let users change it.) The container variant also shows whether the osdf:// container image counts.
+# @sites: chtc ospool
+# @variants: bare
+# @triggers: vacate:150
+# Timeline: voluntary checkpoint (100 MB) at step 30 and an in-place restart (no new input
+# transfer); at ~150 s the vacate: the probe saves again (100 MB) and exits 85, and
+# ON_EXIT_OR_EVICT brings that save to spool. The next start, in a new sandbox, must
+# transfer the 100 MB checkpoint as part of its input.
+max_transfer_input_mb     = 50
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+stream_output = true
+stream_error  = true
+request_disk  = 2GB
+arguments = $(PROBE_ARGS) --voluntary-exit-at 30 --ckpt-mb 100 --ckpt-files 1 --keep 1 --on-sigterm save85 --total-steps 300

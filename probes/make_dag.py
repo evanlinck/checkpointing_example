@@ -40,7 +40,7 @@ SITES = ["chtc", "chtc_gpu", "chtc_backfill", "ospool"]
 
 def parse_test(path):
     meta = {"name": os.path.basename(path)[:-4], "question": "", "sites": [], "triggers": [],
-            "variants": [], "optin": False}
+            "variants": [], "optin": False, "copies": 1}
     with open(path) as f:
         text = f.read()
     for m in re.finditer(r"^# @(\w+):?(.*)$", text, re.M):
@@ -57,6 +57,10 @@ def parse_test(path):
             meta["variants"] = val.split()
         elif key == "optin":
             meta["optin"] = True
+        elif key == "queue":
+            # N independent copies, each its own DAG node and directory (<name>-q1 ... -qN),
+            # so analyze.py still reads one job per directory.
+            meta["copies"] = int(val)
     meta["body"] = text
     return meta
 
@@ -195,40 +199,41 @@ def main():
             trig_options = [x for x in t["triggers"] if not only_triggers or x["action"] in only_triggers]
             if t["triggers"] and not trig_options:
                 continue
-            for bare in bare_options:
-                for trig in (trig_options or [None]):
-                    name = t["name"] + ("-bare" if bare else "") + ("-" + trig["action"] if trig else "")
-                    job_dir = os.path.join(run_dir, site, name)
-                    os.makedirs(job_dir)
-                    with open(os.path.join(job_dir, "job.sub"), "w") as f:
-                        f.write(build_submit(name, site, t, bare, staging_dir))
-                    meta = {"test": name, "base_test": t["name"], "site": site, "bare": bare,
-                            "question": t["question"], "trigger": trig, "tag": args.tag}
-                    if args.check:
-                        rc, out = condor_dry_run(job_dir)
-                        meta["dry_run_rc"], meta["dry_run_output"] = rc, out[-2000:]
-                        if rc != 0:
-                            rejected.append((site, name, out.strip().splitlines()[-1:] or [""]))
-                            with open(os.path.join(job_dir, "meta.json"), "w") as f:
-                                json.dump(meta, f, indent=2)
-                            continue
-                    with open(os.path.join(job_dir, "meta.json"), "w") as f:
-                        json.dump(meta, f, indent=2)
+            copies = [""] if t["copies"] == 1 else ["-q%d" % i for i in range(1, t["copies"] + 1)]
+            for bare, trig, copy in [(b, x, c) for b in bare_options for x in (trig_options or [None])
+                                     for c in copies]:
+                name = t["name"] + ("-bare" if bare else "") + ("-" + trig["action"] if trig else "") + copy
+                job_dir = os.path.join(run_dir, site, name)
+                os.makedirs(job_dir)
+                with open(os.path.join(job_dir, "job.sub"), "w") as f:
+                    f.write(build_submit(name, site, t, bare, staging_dir))
+                meta = {"test": name, "base_test": t["name"], "site": site, "bare": bare,
+                        "question": t["question"], "trigger": trig, "tag": args.tag}
+                if args.check:
+                    rc, out = condor_dry_run(job_dir)
+                    meta["dry_run_rc"], meta["dry_run_output"] = rc, out[-2000:]
+                    if rc != 0:
+                        rejected.append((site, name, out.strip().splitlines()[-1:] or [""]))
+                        with open(os.path.join(job_dir, "meta.json"), "w") as f:
+                            json.dump(meta, f, indent=2)
+                        continue
+                with open(os.path.join(job_dir, "meta.json"), "w") as f:
+                    json.dump(meta, f, indent=2)
 
-                    node = "%s__%s" % (site, name)
-                    dag += ["JOB %s %s DIR %s" % (node, "job.sub", job_dir),
-                            "CATEGORY %s probes" % node,
-                            "SCRIPT POST %s %s %s --test-dir %s --job-id $JOBID"
-                            % (node, sys.executable, os.path.join(HERE, "analyze.py"), job_dir)]
-                    if trig:
-                        with open(os.path.join(job_dir, "trigger.sub"), "w") as f:
-                            f.write(build_trigger_submit(job_dir, trig, condor_bin))
-                        if args.no_trigger_nodes:
-                            manual_triggers.append((job_dir, trig))
-                        else:
-                            dag.append("JOB %s__trigger trigger.sub DIR %s" % (node, job_dir))
-                    dag.append("")
-                    built.append((site, name))
+                node = "%s__%s" % (site, name)
+                dag += ["JOB %s %s DIR %s" % (node, "job.sub", job_dir),
+                        "CATEGORY %s probes" % node,
+                        "SCRIPT POST %s %s %s --test-dir %s --job-id $JOBID"
+                        % (node, sys.executable, os.path.join(HERE, "analyze.py"), job_dir)]
+                if trig:
+                    with open(os.path.join(job_dir, "trigger.sub"), "w") as f:
+                        f.write(build_trigger_submit(job_dir, trig, condor_bin))
+                    if args.no_trigger_nodes:
+                        manual_triggers.append((job_dir, trig))
+                    else:
+                        dag.append("JOB %s__trigger trigger.sub DIR %s" % (node, job_dir))
+                dag.append("")
+                built.append((site, name))
 
     dag += ["MAXJOBS probes %d" % args.maxjobs, ""]
     with open(os.path.join(run_dir, "summary.sub"), "w") as f:

@@ -1,0 +1,18 @@
+# P12a - What happens to a job when its OSPool glidein ends?
+# @question: OSPool glideins are killed at GLIDEIN_ToDie (most stop taking jobs 10 h before). Does a running job get SIGTERM first, and how long before it is killed? Is the kill at ToDie or earlier (the site's batch limit)? Decides whether reading GLIDEIN_ToDie from the machine ad is a useful checkpoint deadline.
+# @sites: ospool
+# @queue: 5
+# Only glideins that will die within 11 h; with the usual 10 h gap between ToRetire and ToDie,
+# a job lands there when the glidein is about to stop taking jobs, so it runs ~10 h.
+# The probe logs GLIDEIN_ToDie at start, ignores any signal, and prints a heartbeat every 5 s
+# (streamed to the AP, so the last one survives a hard kill). One checkpoint at step 5; after
+# the interruption the rescheduled job sees it and exits at once (--exit-on-restart).
+TEST_REQS = (TARGET.GLIDEIN_ToDie =!= undefined) && ((TARGET.GLIDEIN_ToDie - time()) < 11*3600)
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+stream_error  = true
+# Up to ~11 h of running plus matchmaking; a hold means something unexpected: remove at once.
+periodic_remove = ((time() - QDate) > 18*3600) || (JobStatus == 5)
+arguments = $(PROBE_ARGS) --on-sigterm ignore --heartbeat-every 5 --voluntary-exit-at 5 --exit-on-restart --total-steps 43200

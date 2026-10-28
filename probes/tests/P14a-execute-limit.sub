@@ -1,0 +1,10 @@
+# P14a - Does an exit-85 restart reset the per-execution time limit?
+# @question: OSPool access points cap each execution (ap40: AllowedExecuteDuration = 20 h, then a hold). Here allowed_execute_duration = 150 s and the probe exits 85 every 60 s (restarting in place). Does the job finish (each exit-85 restart starts a new execution, so a timed checkpoint keeps a job under the cap), or is it held ~150 s after it first started?
+# @sites: chtc ospool
+# The same limit as ap40's 20 h, shrunk to minutes: users may set it in their own submit file.
+allowed_execute_duration  = 150
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+arguments = $(PROBE_ARGS) --voluntary-exit-at 60,120,180,240,300 --total-steps 360

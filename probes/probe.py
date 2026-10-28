@@ -319,9 +319,16 @@ def save(ckpt_dir, step, reason, args, log, wait_fn):
         os.replace(ptr_tmp, os.path.join(ckpt_dir, "latest"))
         fsync_dir(ckpt_dir)
 
-        # Retention: keep the newest args.keep checkpoints.
+        # Retention: keep the newest args.keep checkpoints. (--keep 0 keeps all: [:-0] is empty.)
         for old in list_complete(ckpt_dir)[:-args.keep]:
             shutil.rmtree(os.path.join(ckpt_dir, old), ignore_errors=True)
+
+        # P13: a small copy with a new name per save (OSDF caches by name), in a directory the
+        # submit file remaps to osdf://. Shows when HTCondor uploads it: at each exit 85, or at the end.
+        if args.backup_dir:
+            os.makedirs(args.backup_dir, exist_ok=True)
+            with open(os.path.join(args.backup_dir, "state_%08d.json" % step), "w") as f:
+                json.dump(state, f)
     except OSError as e:
         log.event("save_error", step=step, reason=reason, error=str(e), seconds=round(time.time() - t0, 3))
         return False
@@ -674,7 +681,7 @@ def mode_run(args, log, marker, job_ad):
                 shutil.copy(log.history_path, os.path.join("out", "history.jsonl"))
             except OSError:
                 pass
-            return finish(EXIT_DONE, "finished %d steps" % step)
+            return finish(args.final_exit_code, "finished %d steps" % step)
 
 
 def main():
@@ -684,7 +691,10 @@ def main():
     ap.add_argument("--mode", choices=["run", "fingerprint", "bench"], default="run")
     ap.add_argument("--store", default="spool", help="label only: spool, staging, scratch, destination")
     ap.add_argument("--ckpt-dir", default="ckpt", help="checkpoint directory (relative = in the job sandbox)")
-    ap.add_argument("--keep", type=int, default=2, help="checkpoints to keep")
+    ap.add_argument("--keep", type=int, default=2, help="checkpoints to keep (0 = all)")
+    ap.add_argument("--backup-dir", default="", help="after each save, also write state_<step>.json here (P13)")
+    ap.add_argument("--final-exit-code", type=int, default=EXIT_DONE,
+                    help="exit code after the last step (P13b: 86, 'continue in a new job')")
     ap.add_argument("--total-steps", type=int, default=300, help="one step per second; exit 0 after this many")
     ap.add_argument("--voluntary-exit-at", default="", help="comma list of steps at which to save and exit 85")
     ap.add_argument("--max-voluntary-exits", type=int, default=0,
@@ -729,6 +739,7 @@ def main():
     ad_fields = {}
     if job_ad:
         for k in ("NumJobStarts", "NumShadowStarts", "JobCurrentStartDate", "JobStartDate",
+                  "AllowedJobDuration", "AllowedExecuteDuration",
                   "ClusterId", "ProcId", "CommittedTime", "KillSig", "JobMaxVacateTime"):
             if k in job_ad:
                 ad_fields[k] = job_ad[k]
@@ -737,7 +748,14 @@ def main():
         except OSError:
             pass
 
-    log.event("start", mode=args.mode, argv=sys.argv[1:], cwd=os.getcwd(),
+    # Where the job runs and, on an OSPool glidein, when the glidein stops taking jobs (ToRetire) and
+    # is killed (ToDie). P12a compares the moment this execution dies with GLIDEIN_ToDie.
+    machine_ad = read_classad_file(os.environ.get("_CONDOR_MACHINE_AD")) or {}
+    machine_fields = {k: machine_ad[k] for k in ("GLIDEIN_Site", "GLIDEIN_ToRetire", "GLIDEIN_ToDie",
+                                                 "GLIDEIN_Max_Walltime", "MachineMaxVacateTime")
+                      if k in machine_ad}
+
+    log.event("start", mode=args.mode, argv=sys.argv[1:], cwd=os.getcwd(), machine_ad=machine_fields,
               scratch_dir=os.environ.get("_CONDOR_SCRATCH_DIR"),
               sandbox_marker_survived=marker_survived, sandbox_created_by=marker.get("created_by"),
               previous_starts_in_sandbox=len(previous_starts), job_ad=ad_fields,

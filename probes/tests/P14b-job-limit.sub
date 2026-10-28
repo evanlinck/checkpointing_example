@@ -1,0 +1,10 @@
+# P14b - How does the total time limit count, and what happens when it is reached?
+# @question: OSPool access points cap a self-checkpointing job's total time (ap40: AllowedJobDuration = 14 days, then a hold). Here allowed_job_duration = 240 s and the probe exits 85 every 60 s. When is the job held: 240 s after it first started (wall clock, across restarts), or after 240 s of running? With what message? Can the job compute its own deadline from JobStartDate + AllowedJobDuration in its job ad?
+# @sites: chtc
+# The same limit as ap40's 14 days, shrunk to minutes: users may set it in their own submit file.
+allowed_job_duration      = 240
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt
+transfer_output_files     = ckpt, out
+stream_output = true
+arguments = $(PROBE_ARGS) --voluntary-exit-at 60,120,180,240,300 --total-steps 360

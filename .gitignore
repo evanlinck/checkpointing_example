@@ -40,10 +40,32 @@ results/**
 !results/**/
 !results/**/*.md
 result_*.txt
-*_run.txt
+*_run*.txt
+# Same rule for reports written inside probes/ (ap_survey.sh's raw .txt files hold job history
+# and AP configuration; only summary.md is kept).
+probes/results/**
+!probes/results/**/
+!probes/results/**/*.md
 
 # Editor tooling bookkeeping
 .cc-writes/
+
+# probes/spool_check/: the job's own outputs (its log has IP addresses and host names)
+probes/spool_check/ckpt/
+probes/spool_check/spool_check.log
+probes/spool_check/spool_check.out
+probes/spool_check/spool_check.err
+
+# Recipe 4: its data, the DAG's hand-off directory, per-test directories, DAGMan's files
+recipes/04_ospool_lora/data/
+recipes/04_ospool_lora/resume/
+recipes/04_ospool_lora/test_*_[0-9]*/
+*.dag.condor.sub
+*.dag.dagman.*
+*.dag.lib.*
+*.dag.nodes.log
+*.dag.rescue*
+*.dag.metrics
 
 # Copies of the shared modules placed next to a recipe for job submission
 recipes/*/htcondor_ckpt/

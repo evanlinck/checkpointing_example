@@ -1,0 +1,9 @@
+# P11d - Do osdf:// inputs count against the input-size limit?
+# @question: With max_transfer_input_mb = 50 and a 100 MB file listed as an osdf:// input (no container): is the job held for exceeding the input limit before it starts? Decides whether large base-model weights read through OSDF are affected by an access point's MAX_TRANSFER_INPUT_MB.
+# @sites: chtc
+# @variants: bare
+# Only the bare variant answers the question cleanly (no container image to count); the
+# container variant is kept as a second data point. Needs: bash setup.sh blobs (once).
+max_transfer_input_mb = 50
+transfer_input_files  = $(OSDF_STAGING)/blobs/blob-100mb-v1.bin
+arguments = $(PROBE_ARGS) --total-steps 20
