@@ -1,0 +1,10 @@
+# P16a - HTCondor's Python bindings in the recipes' container
+# @question: In the shared recipes image (containers/recipes.def, with htcondor 25.x), can a job read its machine and job ads with classad2 (what vacate_budget() needs), and report progress with condor_chirp through htcondor2.htchirp: set LastCheckpointStep / LastCheckpointReason once, read them back, and see them in condor_history afterwards? P0 found the condor_chirp program on CHTC hosts but not inside a plain container.
+# @sites: chtc chtc_gpu ospool
+# Needs the image's URL in the environment when building the DAG:
+#   export PROBE_RECIPES_IMAGE=osdf:///chtc/staging/<user>/images/ckpt-recipes-v1.sif
+container_image = $(RECIPES_IMAGE)
+# Lets the job talk to the access point through its shadow (condor_chirp needs it).
++WantIOProxy = true
+request_disk = 12GB
+arguments = $(PROBE_ARGS) --mode bindings

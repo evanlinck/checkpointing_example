@@ -87,6 +87,7 @@ def build_submit(test_name, site, test, bare, staging_dir):
         % (time.strftime("%Y-%m-%d %H:%M"), site, test["name"]),
         "PROBES    = " + HERE,
         "STAGING_DIR = " + staging_dir,
+        "RECIPES_IMAGE = " + os.environ.get("PROBE_RECIPES_IMAGE", "(set PROBE_RECIPES_IMAGE)"),
         "TEST_NAME = " + test_name,
         "SITE      = " + site,
         "", "# ----- common.sub -----", common,

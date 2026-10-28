@@ -216,8 +216,11 @@ def _ad_number(path, attr):
     """Value of `attr` in the ClassAd file at `path`, as a number, or None."""
     if not path or not os.path.exists(path):
         return None
-    try:  # with the HTCondor Python bindings, evaluate the expression in the ad's context
-        import classad
+    try:  # with HTCondor's Python bindings, evaluate the expression in the ad's context.
+        try:  # 25.x and newer name the module classad2; older versions classad
+            import classad2 as classad
+        except ImportError:
+            import classad
         with open(path) as f:
             value = classad.parseOne(f).eval(attr)
         return float(value) if isinstance(value, (int, float)) else None

@@ -21,6 +21,8 @@ The probes do no ML. `probe.py` pretends to train at one "step" per second and l
 | **P12a** glidein end | Run on OSPool glideins that die within 11 h, until they die. Does the job get SIGTERM first, how long before the kill, and how does the kill compare with `GLIDEIN_ToDie` from the machine ad? Five copies (`# @queue: 5`), up to ~11 h each. |
 | **P14a–b** time caps | OSPool access points cap each execution (ap40: 20 h) and a checkpointing job's total time (14 days). Shrunk to minutes with the user-settable `allowed_execute_duration` / `allowed_job_duration`: does an exit-85 restart reset the per-execution clock (P14a)? When and how does the total cap hold a job, and can the job see its deadline in its job ad (P14b)? |
 | **P13** backups to OSDF | Is a directory listed in `transfer_checkpoint_files` and remapped to `osdf://` with `transfer_output_remaps` uploaded at every exit 85, only at the end, or not at all? (Long runs on OSPool access points need a copy that outlives the job.) **P13b**: the same, ending with exit 86 (a planned hand-off to a new job): are outputs still remapped? |
+| **P15a–b** parallel writes | Recipe 3 saves a ~88 GB checkpoint from one process per GPU at once. How fast is `/staging` with 1, 4 and 8 writers, 1 or several files each? How fast is reading it back (a resume) and deleting it (retention)? How much of the job's memory does the page cache take? Also records what a GPU machine offers a big job: CPUs, host memory, memory limit, memlock limit, `/dev/shm`, network links, and whether free space on `/staging` shows the user's quota. P15a writes 20 GB at a time; P15b (opt-in) 90 GB, which needs a larger quota. |
+| **P16a** Python bindings | In the shared recipes image (`containers/recipes.def`, HTCondor 25.x bindings), can a job evaluate its ads with `classad2` (for `vacate_budget()`) and report progress with `condor_chirp` through `htcondor2.htchirp` (set `LastCheckpointStep` once, read it back, see it in `condor_history`)? On CHTC CPU, GPU and the OSPool. Needs `PROBE_RECIPES_IMAGE`. |
 
 > **Before anything else:** `export PROBE_STAGING_DIR=/staging/<username>` (add it to `~/.bashrc` on the access point). `make_dag.py`, `setup.sh` and `cleanup.sh` refuse to run without it, so no personal path has to be stored in the repo.
 
@@ -40,6 +42,9 @@ The probes do no ML. `probe.py` pretends to train at one "step" per second and l
 | `setup.sh`, `build.sub`, `pytorch-cpu.def` | One-time setup: `/staging` dirs and container images. |
 | `cleanup.sh` | Deletes probe data from `/staging`. |
 | `ap_survey.sh`, `ap_survey_summary.py` | A read-only survey of an access point and its pool (no jobs). See "Surveying an access point". |
+| `gpu_machines.sh`, `gpu_machines_summary.py` | Snapshots of the pool's GPU machines (no jobs): which could run recipe 3, and how often their GPUs are free. See "GPU machines and GPU communication". |
+| `gpu_comm/` | A PyTorch benchmark of GPU-to-GPU communication on real GPU machines (the one probe that needs PyTorch and GPUs). |
+| `run_rounds.sh` | Runs the same probe DAG several times, hours apart, to see how much a number varies. |
 
 ## Load on the schedd
 
@@ -146,11 +151,41 @@ python3 make_dag.py --sites chtc,ospool --tests P13b --check --tag handoff      
 python3 make_dag.py --sites chtc,ospool --tests P14 --check --tag timecaps       # the time caps, shrunk to minutes
 ```
 
+**Step 6: storage speed for recipe 3 (`/staging`, parallel writers).** P15a writes 20 GB at a time and P15b 90 GB, so with CHTC's default `/staging` quota (100 GB) run one job at a time (`--maxjobs 1`) and skip P15b. The `chtc_gpu` copies hold one GPU each for about 10–20 minutes without using it; they're there to land on GPU machines, whose network link to `/staging` is what recipe 3 will use. `/staging` is shared with other users, so run it in rounds a few hours apart (`run_rounds.sh` waits for each round to finish, then sleeps):
+```
+nohup ./run_rounds.sh pstaging 3 6 --sites chtc,chtc_gpu --tests P15a,P15b --optin P15b --maxjobs 2 > rounds_run.txt 2>&1 &
+```
+Results: `results/pstaging-r1/summary.md`, `-r2`, `-r3`. Reading back right after writing may be faster than a real resume on a new machine: the probe asks the kernel to drop its cached copy, but a network filesystem may keep some of it. Treat the read speed as an upper bound.
+
+**Step 7: HTCondor's Python bindings in the recipes' image (after building it, see `containers/`).**
+```
+export PROBE_RECIPES_IMAGE=osdf:///chtc/staging/<user>/images/ckpt-recipes-v1.sif
+python3 make_dag.py --sites chtc,chtc_gpu,ospool --tests P16 --check --tag bindings
+condor_submit_dag runs/bindings/probes.dag
+```
+Afterwards, `condor_history <job> -af LastCheckpointStep LastCheckpointReason` should print `12345 probe` for each job where chirp worked.
+
+## GPU machines and GPU communication (recipe 3)
+
+**Which machines could run recipe 3, and how often are 4 of their GPUs free?** No jobs: a `condor_status` snapshot every 30 minutes for a day.
+```
+nohup ./gpu_machines.sh > gpu_machines_run.txt 2>&1 &          # or: ./gpu_machines.sh <snapshots> <minutes apart>
+```
+`results/gpu-machines/<tag>/summary.md` is rewritten after each snapshot. The raw snapshots (with machine names) stay in `runs/`.
+
+**How fast do the GPUs of one machine talk to each other?** FSDP moves ~60 GB per GPU per step for a 7B model, so a machine without NVLink can be much slower, or hang (recipe 2 saw RTX PRO 6000 machines hang with direct PCIe copies). `gpu_comm/run_comm_bench.sh` submits 8 short jobs (4 and 2 GPUs; NCCL's default and `NCCL_P2P_LEVEL=NVL`; 2 copies each), about 2–3 GPU-hours in all, waits for them (event log only) and writes `results/gpu-comm/<tag>/summary.md`. It needs a PyTorch GPU image: the shared recipes image, or recipe 1's.
+```
+export RECIPES_IMAGE=osdf:///chtc/staging/<user>/images/ckpt-recipes-v1.sif
+nohup gpu_comm/run_comm_bench.sh > comm_run.txt 2>&1 &
+nohup gpu_comm/run_comm_bench.sh -a 'require_gpus = DeviceName == "NVIDIA L40S"' > comm_l40s.txt 2>&1 &   # one GPU type
+```
+
 **Opt-in tests** need to be named with `--optin`:
 - `P3e`: waits up to 6 h for a real backfill eviction. It holds a GPU the whole time.
 - `P5b`: 10 GB writes.
 - `P5e`: a 5 GB checkpoint through spool.
 - `P7e`: `torchrun`, needs `pytorch.sif`.
+- `P15b`: 90 GB parallel writes to `/staging` (request a larger quota first).
 
 For example:
 ```

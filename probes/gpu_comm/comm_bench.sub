@@ -1,0 +1,39 @@
+# GPU communication benchmark for recipe 3 (maintainer tooling). Usually submitted by
+# run_comm_bench.sh; by hand:
+#   condor_submit comm_bench.sub -a "IMAGE = osdf:///chtc/staging/<user>/images/ckpt-recipes-v1.sif"
+#   condor_submit comm_bench.sub -a "NGPUS = 2" -a "P2P = NVL" ...
+# About 3-5 minutes per job (plus the timeout if the GPUs can't talk: 2 minutes).
+
+NGPUS        = 4
+# NCCL_P2P_LEVEL: empty = NCCL's default (direct GPU-to-GPU copies over PCIe allowed);
+# NVL = direct copies only over NVLink, otherwise through host memory (recipe 2's setting).
+P2P          =
+IMAGE        = osdf:///chtc/staging/<user>/images/ckpt-recipes-v1.sif
+RUN_DIR      = .
+
+universe     = vanilla
+# HOME: the container is read-only. NCCL_P2P_LEVEL is set only when P2P isn't empty.
+# NCCL_DEBUG INFO/INIT: the transport NCCL chose goes to the .err file.
+shell        = export HOME=$PWD; P2P="$(P2P)"; [ -n "$P2P" ] && export NCCL_P2P_LEVEL=$P2P; exec torchrun --standalone --nproc_per_node=$(NGPUS) comm_bench.py
+transfer_input_files = comm_bench.py
+environment  = "NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT"
+container_image = $(IMAGE)
+
+request_gpus = $(NGPUS)
+# Machines recipe 3 could use: bf16, and enough GPU memory for a 7B model split over 4 GPUs.
+gpus_minimum_memory     = 40000M
+gpus_minimum_capability = 8.0
++WantGPULab   = true
++GPUJobLength = "short"
+# Also backfill slots, to sample more machines (an eviction just reruns this short job).
++is_resumable = true
+request_cpus   = $(NGPUS)
+request_memory = 16GB
+request_disk   = 10GB
+
+log    = $(RUN_DIR)/comm.log
+output = $(RUN_DIR)/comm_$(Cluster).$(Process).out
+error  = $(RUN_DIR)/comm_$(Cluster).$(Process).err
+# A job that hangs (GPUs can't reach each other) is removed after 20 minutes.
+periodic_remove = (JobStatus == 2) && (time() - EnteredCurrentStatus > 1200)
+queue $(COPIES:1)

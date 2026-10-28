@@ -11,7 +11,7 @@ There are five recipes. The first four build on each other; recipe 4 stands apar
 0. `recipes/00_minimal/`: one short plain-PyTorch script with no dependency on our package. It shows the five blocks every job needs (signal flag, atomic save, resume, exit 85, finish). Spec: `docs/00-minimal.md`.
 1. `recipes/01_tinystories/`: small GPT trained from scratch on one GPU. Teaches the full single-GPU contract, checkpointing at epoch boundaries *and* during an epoch, and every storage mode. Spec: `docs/01-tinystories-gpt.md`.
 2. `recipes/02_gpt2_fineweb/`: GPT-2 124M trained from scratch with DDP on one multi-GPU node. Teaches distributed stop agreement, launchers, and long multi-execution runs. Spec: `docs/02-gpt2-fineweb-ddp.md`.
-3. `recipes/03_fsdp_finetune/`: full fine-tune of a ~7–8B model with FSDP2 and PyTorch Distributed Checkpoint (DCP). Teaches sharded, async and resharding checkpoints under a time and storage budget. Spec: `docs/03-fsdp-dcp-finetune.md`.
+3. `recipes/03_fsdp_finetune/`: full fine-tune of a ~7B model (OLMo 3 7B) with FSDP2 and PyTorch Distributed Checkpoint (DCP). Teaches sharded, async and resharding checkpoints under a time and storage budget. Spec: `docs/03-fsdp-dcp-finetune.md`.
 4. `recipes/04_ospool_lora/`: LoRA fine-tune of a ~1.5B model on one OSPool GPU, laid out like a typical OSPool job. Teaches checkpointing where interruptions come without warning (glidein ends), the access point's time and input limits, and continuing past a job's total-time limit with a DAG (exit 86 hand-off). Written for readers with little programming experience. Spec: `docs/04-ospool-lora.md`.
 
 Build them in order, except that recipe 4 was built before recipe 3 at the user's request (2026-10-27). Do not start a later recipe until the earlier one passes its acceptance criteria.
@@ -40,7 +40,8 @@ The facts that shape everything below:
 - **OSPool:** reached from ap2002 with `want_ospool = true` and `requirements = (Poolname =!= "CHTC")`.
 - **Execute points have internet access** (CHTC and OSPool). Large datasets and weights should still be staged ahead of time, for speed and reproducibility.
 - **GPUs per node:** up to **4 H200s** per job. Recipes 2–3 default to 4.
-- **GPU PyTorch images:** the user has working PyTorch GPU containers. Ask for them when a recipe first needs a GPU image, instead of building one.
+- **Containers:** recipes 1–4 share one GPU image, built from `containers/recipes.def` (PyTorch 2.8 + CUDA 12.8 and every package the recipes need; decided 2026-10-28). Add packages there, not per recipe, and give a rebuilt image a new name. Recipe 0 keeps its own small CPU-only image. Recipes 1, 2 and 4 still point at their older images until they are moved over and retested.
+- **Models:** a different model family in each recipe (a hand-written GPT, GPT-2, Qwen, OLMo), so users see different things.
 
 ## Repository layout
 
@@ -52,6 +53,7 @@ docs/
   checkpointing-guide.md      # user-facing guide, written last
 probes/                       # maintainer tooling: HTCondor behavior tests (done; rerun when the pool changes). Never used by recipes.
 results/                      # probe result summaries cited by docs/environment.md
+containers/                   # the shared GPU image for recipes 1-4 (recipes.def, requirements.txt, build job)
 htcondor_ckpt/                # shared checkpointing modules: written package-ready, NOT packaged yet
   stop.py                     # StopPolicy: signal flag, stop file, runtime limit, deadline, vacate_budget()
   store.py                    # atomic checkpoint dirs, `latest` pointer, discovery + fallback, retention, .tmp cleanup
@@ -85,7 +87,7 @@ recipes/
 
 Each works on its own when copied into a user's project. The files use `# ===== CHECKPOINT: <name> =====` banners.
 
-Each recipe directory contains: `prepare_data.py` (except recipe 0), `train.py`, `config.yaml`, submit files (starting the job with `shell = exec python3 ...`, or a `run.sh` that `exec`s), `requirements.txt` and `container.def`, local and HTCondor test scripts, and a user-facing `README.md`.
+Each recipe directory contains: `prepare_data.py` (except recipe 0), `train.py`, `config.yaml`, submit files (starting the job with `shell = exec python3 ...`, or a `run.sh` that `exec`s), local and HTCondor test scripts, and a user-facing `README.md`.
 
 ## The checkpointing contract
 
@@ -200,6 +202,7 @@ Each recipe must pass:
 
 - Recipes: Python 3.11+ in containers. The package core: Python 3.9+. As few dependencies as practical (`numpy`, `tiktoken` or Hugging Face tokenizers, `datasets` for preparation only, `pyyaml`). Pin versions per recipe.
 - Configuration in YAML loaded into a dataclass, with CLI overrides for common fields.
+- **Plain language, easy to skim and modify** (decided 2026-10-28), for every recipe and for `htcondor_ckpt/`. Someone with only a little knowledge should be able to skim a recipe and adapt it. Recipes 0 and 4 are the model: `train.py` in numbered sections listed in its docstring, a comment on almost every line, READMEs built from tables ("what happens", "what's in a checkpoint", "where the files live"), numbered "Run it" steps, and "Using it for your own model". Advanced recipes (recipe 3) may contain advanced features, but each sits in its own labeled section with a plain explanation, and hard mechanics go behind helpers with plain names. Recipe 2 will be rewritten in this style later.
 - Comments explain *why*, especially around checkpointing decisions. These files are teaching material. When a decision rests on a measurement, say so ("HTCondor signals only the top process; see docs/environment.md §6").
 - Mark checkpoint code in recipe 0 and in `examples/` with `# ===== CHECKPOINT: <name> =====` banners so users can find and copy each block. The guide's snippets are taken verbatim from them.
 - No hidden magic: a user should be able to trace every saved field from save to restore.

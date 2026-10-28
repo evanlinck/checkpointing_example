@@ -100,6 +100,23 @@ def test_vacate_budget_unevaluable_falls_back(tmp_path):
     assert seconds == 600 or source == "MachineMaxVacateTime"
 
 
+def test_vacate_budget_uses_classad2_when_installed(tmp_path, monkeypatch):
+    """HTCondor 25.x's bindings name the module classad2: the expression is evaluated there,
+    so an ad value plain arithmetic can't handle still works."""
+    import sys
+    import types
+
+    class FakeAd:
+        def eval(self, attr):
+            return 450
+
+    fake = types.ModuleType("classad2")
+    fake.parseOne = lambda f: FakeAd()
+    monkeypatch.setitem(sys.modules, "classad2", fake)
+    m = write_ad(tmp_path / "machine", MachineMaxVacateTime="SomeOtherAttribute * 2")
+    assert vacate_budget(m, str(tmp_path / "missing")) == (450, "MachineMaxVacateTime")
+
+
 def test_vacate_budget_no_ads(monkeypatch):
     monkeypatch.delenv("_CONDOR_MACHINE_AD", raising=False)
     monkeypatch.delenv("_CONDOR_JOB_AD", raising=False)

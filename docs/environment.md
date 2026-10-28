@@ -181,6 +181,9 @@ Single run per number; treat these as orders of magnitude.
 | Effective vacate window from the ads at job start | Planned `vacate_budget()` helper | Log the estimate in probe starts; compare to P3 measurements |
 | ~~OSPool glidein-end eviction~~ | Closed by P12a (§10): no SIGTERM; a hard kill 104–355 s after `GLIDEIN_ToDie` | – |
 | `checkpoint_destination` + `ON_EXIT_OR_EVICT` | Whether the off-AP destination can also carry a SIGTERM save | One P6a variant |
+| Parallel write and read speed on `/staging` (P15) | Recipe 3's ~88 GB sharded checkpoint must be saved well inside the 600 s window; §7 has only single-writer numbers (409 MB/s, 1 GB). Also: host memory, memlock and `/dev/shm` on GPU machines, and whether the page cache counts against the job's memory | `probes/` P15a (20 GB, 1/4/8 writers); P15b at 90 GB after a quota increase |
+| HTCondor's Python bindings in a container (P16) | The 25.x bindings name their modules `classad2` / `htcondor2` (no `classad` module), so `vacate_budget()` silently fell back to plain arithmetic; `stop.py` now tries `classad2` first. Planned `chirp.py` needs `htcondor2.htchirp` to work in a container, on CHTC and the OSPool | `probes/` P16a with the shared recipes image |
+| GPU machines for recipe 3, and GPU-to-GPU speed | Which machines have 4 GPUs of ≥ 40–80 GB, their host memory, how often 4 GPUs are free; how fast all-gather / reduce-scatter run with and without NVLink (FSDP moves ~60 GB per GPU per step for a 7B model) | `probes/gpu_machines.sh` (no jobs), `probes/gpu_comm/` |
 | GPU-enabled PyTorch image, GPU model on GPU Lab slots | Recipes target H200s; P0 did not record the device name | Build a CUDA image; read `GPUs_DeviceName` in the machine ad |
 
 ## 10. Access points: spool, limits and policy (surveyed)

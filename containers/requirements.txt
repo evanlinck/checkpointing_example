@@ -1,0 +1,13 @@
+# Python packages for the shared GPU image used by recipes 1-4 (containers/recipes.def).
+# PyTorch 2.8.0 (CUDA 12.8) comes with the base image, so it isn't listed: installing it again
+# would replace the image's CUDA build. These versions were resolved together on 2026-10-28
+# (uv pip compile, Python 3.11 and 3.12); the build also writes the full list to /opt/versions.txt.
+numpy==2.0.2
+pyyaml==6.0.3
+tiktoken==0.14.0        # GPT-2 tokenizer (recipes 1 and 2)
+datasets==4.8.5         # data preparation only. 5.x needs huggingface-hub 1.x, which transformers 4.x refuses
+transformers==4.57.6    # loads Hugging Face models (recipes 3 and 4). 4.57 is the first with OLMo 3
+peft==0.17.1            # LoRA adapters (recipe 4)
+htcondor==25.14.1       # HTCondor's Python bindings (as on the execute points): classad2 for reading the
+                        # job and machine ads, htcondor2.htchirp for condor_chirp. Optional: everything
+                        # works without them. Since 25.x the modules are named classad2 and htcondor2.

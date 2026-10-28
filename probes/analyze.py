@@ -373,6 +373,40 @@ def analyze_test(job_dir, job_id=None):
         else:
             obs.append("bench %s %s MB: ERROR %s" % (b.get("target"), b.get("mb"), b.get("error")))
 
+    # Parallel writes (P15): one line per configuration, then the environment
+    for b in recs:
+        e = b.get("event")
+        if e == "pbench_write":
+            obs.append("pbench write: %d writer(s) x %d file(s), %.1f GB: %.1f s (%.0f MB/s; writers %.1f-%.1f s, "
+                       "%.0f%% of it in fsync), rename %.3f s, job memory peak %s GB"
+                       % (b["writers"], b["files_per_writer"], b["bytes"] / 1e9, b["write_seconds"], b["mb_per_s"],
+                          b["fastest_writer_s"], b["slowest_writer_s"], 100 * b["fsync_share"],
+                          b["rename_seconds"], b.get("job_memory_peak_gb")))
+        elif e == "pbench_read":
+            obs.append("pbench read: %d reader(s), %d file(s), %.1f GB: %.1f s (%.0f MB/s)"
+                       % (b["readers"], b["files"], b["bytes"] / 1e9, b["read_seconds"], b["mb_per_s"]))
+        elif e == "pbench_delete":
+            obs.append("pbench delete: %d file(s) in %.2f s" % (b["files"], b["delete_seconds"]))
+        elif e == "pbench_error":
+            obs.append("pbench ERROR (%s writer(s), %s file(s) each): %s"
+                       % (b.get("writers"), b.get("files_per_writer"), b.get("error")))
+        elif e == "pbench_env":
+            ma = b.get("machine_ad") or {}
+            obs.append("pbench machine: %s CPUs usable, host memory %.0f GB, job memory limit %s, memlock %s, "
+                       "/dev/shm %s GB, network %s Mbit/s, target %s (%s), target reports %s GB free; %s"
+                       % (b.get("cpus_usable"), (b.get("memtotal") or 0) / 1e9,
+                          "%.0f GB" % (b["cgroup_memory_max"] / 1e9) if b.get("cgroup_memory_max") else "none seen",
+                          b.get("memlock_limit"), (b.get("dev_shm") or {}).get("total_gb"),
+                          b.get("net_speed_mbit"), (b.get("target") or {}).get("mount"),
+                          (b.get("target") or {}).get("fstype"), (b.get("target_fs") or {}).get("free_gb"),
+                          ", ".join("%s=%s" % kv for kv in sorted(ma.items()))))
+
+    # Bindings (P16)
+    for b in recs:
+        if b.get("event") == "bindings":
+            obs.append("bindings: modules %s; classad2 eval %s; chirp %s; .chirp.config present: %s"
+                       % (b.get("modules"), b.get("classad2_eval"), b.get("chirp"), b.get("chirp_config_exists")))
+
     # Fingerprint (P0)
     fp_path = os.path.join(job_dir, "out", "fingerprint.json")
     if os.path.exists(fp_path):

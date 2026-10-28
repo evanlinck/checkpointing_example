@@ -18,6 +18,8 @@ Modes
   --mode run          (default) the fake training loop
   --mode fingerprint  describe the EP / container and exit 0
   --mode bench        time checkpoint-sized writes to one or more directories
+  --mode pbench       time a sharded checkpoint: several processes writing (and reading) at once
+  --mode bindings     HTCondor Python bindings in the container: classad2 and condor_chirp
 """
 
 import argparse
@@ -523,6 +525,305 @@ def mode_bench(args, log):
     return EXIT_DONE
 
 
+# --------------------------------------------------------------------------
+# Parallel checkpoint writes (P15): how a sharded checkpoint (one writer per GPU,
+# as PyTorch Distributed Checkpoint does) behaves on /staging.
+# --------------------------------------------------------------------------
+
+def _cgroup_file(name):
+    """A cgroup v2 memory file of this job (memory.current, memory.max, memory.peak), or v1's equivalent."""
+    v1 = {"memory.current": "memory.usage_in_bytes", "memory.max": "memory.limit_in_bytes",
+          "memory.peak": "memory.max_usage_in_bytes"}
+    for path in ("/sys/fs/cgroup/" + name, "/sys/fs/cgroup/memory/" + v1.get(name, name)):
+        try:
+            with open(path) as f:
+                v = f.read().strip()
+            return None if v == "max" else int(v)
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def _mount_of(path):
+    """The mount point and filesystem type that hold `path` (longest matching prefix in /proc/mounts)."""
+    best = ("", "?")
+    try:
+        real = os.path.realpath(path)
+        with open("/proc/mounts") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 3 and (real == parts[1] or real.startswith(parts[1].rstrip("/") + "/")):
+                    if len(parts[1]) > len(best[0]):
+                        best = (parts[1], parts[2])
+    except OSError:
+        pass
+    return {"mount": best[0], "fstype": best[1]}
+
+
+def pbench_environment(target):
+    """What the machine offers a big multi-GPU job, beyond the GPUs themselves: CPUs, memory
+    (and the job's cgroup limit), how much memory may be pinned (async saves pin CPU memory),
+    /dev/shm (NCCL and DataLoader workers use it), network links, and what the filesystem
+    reports for the target (does free space reflect the user's /staging quota?)."""
+    import resource
+    info = {"cpus_usable": len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count(),
+            "cgroup_memory_max": _cgroup_file("memory.max"),
+            "target": _mount_of(target)}
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith(("MemTotal:", "MemAvailable:")):
+                    k, v = line.split(":")
+                    info[k.lower()] = int(v.split()[0]) * 1024
+    except OSError:
+        pass
+    soft, hard = resource.getrlimit(resource.RLIMIT_MEMLOCK)
+    info["memlock_limit"] = {"soft": None if soft == resource.RLIM_INFINITY else soft,
+                             "hard": None if hard == resource.RLIM_INFINITY else hard}
+    for label, path in (("dev_shm", "/dev/shm"), ("scratch", "."), ("target_fs", target)):
+        try:
+            du = shutil.disk_usage(path)
+            info[label] = {"total_gb": round(du.total / 1e9, 1), "free_gb": round(du.free / 1e9, 1)}
+        except OSError as e:
+            info[label] = {"error": str(e)}
+    nets = {}
+    for dev in sorted(os.listdir("/sys/class/net")) if os.path.isdir("/sys/class/net") else []:
+        try:
+            with open("/sys/class/net/%s/speed" % dev) as f:
+                nets[dev] = int(f.read().strip())   # Mbit/s; -1 or unreadable for virtual devices
+        except (OSError, ValueError):
+            continue
+    info["net_speed_mbit"] = nets
+    machine_ad = read_classad_file(os.environ.get("_CONDOR_MACHINE_AD")) or {}
+    info["machine_ad"] = {k: v for k, v in machine_ad.items()
+                          if re.search(r"^(Cpus|TotalCpus|Memory|TotalMemory|Gpus|TotalGpus|GPUs_DeviceName|"
+                                       r"GPUs_GlobalMemoryMb|CUDADeviceName|Machine|BackfillSlot)$", k)}
+    return info
+
+
+def _pbench_write_worker(paths, bytes_per_file, barrier, results):
+    """One writer (think: one GPU's share of a sharded checkpoint): write its files, fsync each."""
+    buf = ONE_MB * 16
+    barrier.wait()
+    t0 = time.time()
+    write_s = fsync_s = 0.0
+    for path in paths:
+        with open(path, "wb") as f:
+            a = time.time()
+            left = bytes_per_file
+            while left > 0:
+                n = f.write(buf if left >= len(buf) else buf[:left])
+                left -= n
+            f.flush()
+            b = time.time()
+            os.fsync(f.fileno())      # the data is on /staging only after this
+            write_s += b - a
+            fsync_s += time.time() - b
+    results.put({"pid": os.getpid(), "seconds": time.time() - t0, "write_s": write_s, "fsync_s": fsync_s})
+
+
+def _pbench_read_worker(paths, barrier, results):
+    """One reader (one GPU loading its share when the job resumes)."""
+    buf = bytearray(16 * 1024 * 1024)
+    barrier.wait()
+    t0 = time.time()
+    total = 0
+    for path in paths:
+        with open(path, "rb", buffering=0) as f:
+            while True:
+                n = f.readinto(buf)
+                if not n:
+                    break
+                total += n
+    results.put({"pid": os.getpid(), "seconds": time.time() - t0, "bytes": total})
+
+
+def _pbench_run(target_fn, groups, extra_args, timeout):
+    """Start one process per group of files, release them together, and sample the job's
+    memory use (page cache counts against the job's memory limit) until all are done."""
+    ctx = multiprocessing.get_context("fork")
+    barrier = ctx.Barrier(len(groups) + 1)
+    results = ctx.Queue()
+    procs = [ctx.Process(target=target_fn, args=(g,) + extra_args + (barrier, results)) for g in groups]
+    for p in procs:
+        p.start()
+    barrier.wait()
+    t0 = time.time()
+    mem_peak = _cgroup_file("memory.current") or 0
+    timed_out = False
+    while any(p.is_alive() for p in procs):
+        if time.time() - t0 > timeout:
+            timed_out = True
+            for p in procs:
+                p.terminate()
+            break
+        mem_peak = max(mem_peak, _cgroup_file("memory.current") or 0)
+        time.sleep(0.2)
+    seconds = time.time() - t0
+    out = []
+    while len(out) < len(procs) and not timed_out:
+        try:
+            out.append(results.get(timeout=5))
+        except Exception:
+            break
+    for p in procs:
+        p.join(5)
+    return seconds, out, mem_peak, timed_out
+
+
+def mode_pbench(args, log):
+    """For each (writers, files per writer): write --pbench-gb in total from that many processes at
+    once, fsync, rename the directory (as CheckpointStore does); optionally read it all back the same
+    way (a resume); then delete it (what retention costs). One configuration on disk at a time."""
+    target = args.pbench_target
+    base = os.path.join(target, "pbench_%s" % EXEC_ID)
+    try:
+        os.makedirs(base, exist_ok=True)
+    except OSError as e:
+        log.event("pbench_error", target=target, error=str(e))
+        log.event("exit", code=EXIT_DONE, reason="pbench: cannot create target")
+        return EXIT_DONE
+    env = pbench_environment(base)
+    with open(os.path.join("out", "pbench_env.json"), "w") as f:
+        json.dump(env, f, indent=2, sort_keys=True, default=str)
+    log.event("pbench_env", **env)
+
+    total = int(args.pbench_gb * 1e9)
+    chunk = 16 * 1024 * 1024
+    for writers in [int(x) for x in args.pbench_writers.split(",") if x]:
+        for per_writer in [int(x) for x in args.pbench_files.split(",") if x]:
+            nfiles = writers * per_writer
+            bytes_per_file = max(chunk, (total // nfiles) // chunk * chunk)
+            d = os.path.join(base, "w%d_f%d.tmp" % (writers, per_writer))
+            final = d[:-4]
+            rec = {"target": target, "writers": writers, "files_per_writer": per_writer, "files": nfiles,
+                   "bytes": bytes_per_file * nfiles}
+            try:
+                os.makedirs(d)
+                groups = [[os.path.join(d, "rank%02d_%02d.bin" % (w, i)) for i in range(per_writer)]
+                          for w in range(writers)]
+                seconds, res, mem_peak, timed_out = _pbench_run(_pbench_write_worker, groups, (bytes_per_file,),
+                                                                args.pbench_timeout)
+                if timed_out or len(res) < writers:
+                    raise OSError("write did not finish within %d s (%d of %d writers reported)"
+                                  % (args.pbench_timeout, len(res), writers))
+                t = time.time()
+                fsync_dir(d)
+                os.rename(d, final)
+                fsync_dir(base)
+                # The save took as long as its slowest writer (all start together at the barrier).
+                seconds = max(r["seconds"] for r in res)
+                rec.update(write_seconds=round(seconds, 2), rename_seconds=round(time.time() - t, 3),
+                           mb_per_s=round(rec["bytes"] / 1e6 / max(seconds, 1e-6), 1),
+                           slowest_writer_s=round(max(r["seconds"] for r in res), 2),
+                           fastest_writer_s=round(min(r["seconds"] for r in res), 2),
+                           fsync_share=round(sum(r["fsync_s"] for r in res) /
+                                             max(sum(r["write_s"] + r["fsync_s"] for r in res), 1e-6), 2),
+                           job_memory_peak_gb=round(mem_peak / 1e9, 2) if mem_peak else None)
+                log.event("pbench_write", **rec)
+
+                if args.pbench_read:
+                    # Ask the kernel to forget its cached copy, so the read comes from /staging (as it
+                    # would on a new machine). Network filesystems may still keep some of it.
+                    for g in groups:
+                        for p in g:
+                            p = os.path.join(final, os.path.basename(p))
+                            fd = os.open(p, os.O_RDONLY)
+                            try:
+                                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
+                            finally:
+                                os.close(fd)
+                    rgroups = [[os.path.join(final, os.path.basename(p)) for p in g] for g in groups]
+                    seconds, res, mem_peak, timed_out = _pbench_run(_pbench_read_worker, rgroups, (),
+                                                                    args.pbench_timeout)
+                    if timed_out or len(res) < writers:
+                        raise OSError("read did not finish within %d s" % args.pbench_timeout)
+                    seconds = max(r["seconds"] for r in res)
+                    log.event("pbench_read", target=target, readers=writers, files=nfiles,
+                              bytes=sum(r["bytes"] for r in res), read_seconds=round(seconds, 2),
+                              mb_per_s=round(sum(r["bytes"] for r in res) / 1e6 / max(seconds, 1e-6), 1),
+                              job_memory_peak_gb=round(mem_peak / 1e9, 2) if mem_peak else None)
+            except OSError as e:
+                log.event("pbench_error", writers=writers, files_per_writer=per_writer, error=str(e))
+            finally:
+                t = time.time()
+                shutil.rmtree(d, ignore_errors=True)
+                existed = os.path.exists(final)
+                shutil.rmtree(final, ignore_errors=True)
+                if existed:
+                    log.event("pbench_delete", writers=writers, files=nfiles, delete_seconds=round(time.time() - t, 2))
+    peak = _cgroup_file("memory.peak")
+    shutil.rmtree(base, ignore_errors=True)
+    log.event("exit", code=EXIT_DONE, reason="pbench done",
+              job_memory_peak_gb=round(peak / 1e9, 2) if peak else None)
+    return EXIT_DONE
+
+
+# --------------------------------------------------------------------------
+# HTCondor's Python bindings inside the recipes' container (P16): can a job read its own
+# ads with classad2, and report progress with condor_chirp (htcondor2.htchirp)?
+# --------------------------------------------------------------------------
+
+def mode_bindings(args, log):
+    info = {"chirp_config_env": os.environ.get("_CONDOR_CHIRP_CONFIG"),
+            "chirp_config_exists": os.path.exists(os.environ.get("_CONDOR_CHIRP_CONFIG", ".chirp.config"))}
+    mods = {}
+    for name in ("classad2", "classad", "htcondor2", "htcondor"):
+        try:
+            m = __import__(name)
+            mods[name] = getattr(m, "__version__", None) or "imported"
+        except Exception as e:
+            mods[name] = "absent (%s)" % type(e).__name__
+    info["modules"] = mods
+
+    # What htcondor_ckpt.stop.vacate_budget() would read, evaluated by the bindings.
+    try:
+        import classad2
+        ads = {}
+        for label, var, attr in (("machine", "_CONDOR_MACHINE_AD", "MachineMaxVacateTime"),
+                                 ("job", "_CONDOR_JOB_AD", "JobMaxVacateTime")):
+            path = os.environ.get(var)
+            if path and os.path.exists(path):
+                with open(path) as f:
+                    ad = classad2.parseOne(f.read())
+                try:
+                    ads[attr] = ad.eval(attr)
+                except Exception as e:
+                    ads[attr] = "not in ad (%s)" % type(e).__name__
+        info["classad2_eval"] = {k: (v if isinstance(v, (int, float, str)) else repr(v)) for k, v in ads.items()}
+    except Exception as e:
+        info["classad2_eval"] = "failed: %s" % e
+
+    # condor_chirp through the bindings: read an attribute, set two (once, as a checkpoint
+    # would), read one back. Needs +WantIOProxy = true in the submit file.
+    try:
+        from htcondor2.htchirp import HTChirp
+    except ImportError:
+        try:
+            from htcondor.htchirp import HTChirp
+        except ImportError as e:
+            HTChirp = None
+            info["chirp"] = "no htchirp module (%s)" % e
+    if HTChirp is not None:
+        calls = {}
+        try:
+            t0 = time.time()
+            with HTChirp() as chirp:
+                calls["connect_s"] = round(time.time() - t0, 3)
+                t = time.time()
+                calls["ClusterId"] = chirp.get_job_attr("ClusterId")
+                chirp.set_job_attr("LastCheckpointStep", "12345")
+                chirp.set_job_attr("LastCheckpointReason", '"probe"')
+                calls["LastCheckpointStep_readback"] = chirp.get_job_attr("LastCheckpointStep")
+                calls["calls_s"] = round(time.time() - t, 3)
+            info["chirp"] = calls
+        except Exception as e:
+            info["chirp"] = dict(calls, error="%s: %s" % (type(e).__name__, e))
+    log.event("bindings", **info)
+    log.event("exit", code=EXIT_DONE, reason="bindings done")
+    return EXIT_DONE
+
+
 def mode_run(args, log, marker, job_ad):
     ckpt_dir = os.path.abspath(args.ckpt_dir)
     if RANK is not None:
@@ -688,7 +989,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--test", default="local", help="test name, recorded in every event")
     ap.add_argument("--job-id", default="local", help="$(Cluster).$(Process)")
-    ap.add_argument("--mode", choices=["run", "fingerprint", "bench"], default="run")
+    ap.add_argument("--mode", choices=["run", "fingerprint", "bench", "pbench", "bindings"], default="run")
     ap.add_argument("--store", default="spool", help="label only: spool, staging, scratch, destination")
     ap.add_argument("--ckpt-dir", default="ckpt", help="checkpoint directory (relative = in the job sandbox)")
     ap.add_argument("--keep", type=int, default=2, help="checkpoints to keep (0 = all)")
@@ -718,6 +1019,12 @@ def main():
     ap.add_argument("--bench-targets", default=".", help="bench: comma list of directories")
     ap.add_argument("--bench-mb", default="100,1000", help="bench: comma list of sizes in MB")
     ap.add_argument("--bench-files", default="1,64", help="bench: comma list of file counts")
+    ap.add_argument("--pbench-target", default=".", help="pbench: directory to write into (e.g. on /staging)")
+    ap.add_argument("--pbench-gb", type=float, default=20, help="pbench: total size of each test checkpoint, GB")
+    ap.add_argument("--pbench-writers", default="1,4,8", help="pbench: comma list of writer counts (think: GPUs)")
+    ap.add_argument("--pbench-files", default="1,4", help="pbench: comma list of files per writer")
+    ap.add_argument("--pbench-read", action="store_true", help="pbench: also read each checkpoint back (a resume)")
+    ap.add_argument("--pbench-timeout", type=int, default=1800, help="pbench: give up on one write or read after N s")
     args = ap.parse_args()
 
     for s in WATCHED_SIGNALS:
@@ -765,6 +1072,10 @@ def main():
         code = mode_fingerprint(args, log)
     elif args.mode == "bench":
         code = mode_bench(args, log)
+    elif args.mode == "pbench":
+        code = mode_pbench(args, log)
+    elif args.mode == "bindings":
+        code = mode_bindings(args, log)
     else:
         code = mode_run(args, log, marker, job_ad)
     sys.stdout.flush()

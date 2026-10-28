@@ -1,0 +1,49 @@
+# The shared GPU image for recipes 1-4: PyTorch 2.8 with CUDA 12.8, a C compiler for torch.compile,
+# and the packages in requirements.txt. (Recipe 0 keeps its own small CPU-only image.)
+#
+# Build it on CHTC with the build job next to this file (it puts the image on /staging):
+#   condor_submit build_image.sub -a "OUT_DIR = /staging/<user>/images"
+# or by hand, in an interactive build job (condor_submit -i build_image.sub):
+#   apptainer build ckpt-recipes-v1.sif recipes.def
+#
+# Jobs then use it with:
+#   container_image = osdf:///chtc/staging/<user>/images/ckpt-recipes-v1.sif
+# OSDF caches files by name: when you rebuild, use a new name (-v2, -v3, ...).
+#
+# Why CUDA 12.8: the base image's CUDA must not be newer than the GPU drivers on the machines.
+# CHTC's GPU slots reported driver CUDA 12.8 (docs/environment.md). 12.8 is also the first
+# CUDA with kernels for Blackwell GPUs (RTX PRO 6000, compute capability 12.0).
+Bootstrap: docker
+From: pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
+
+%files
+    requirements.txt /opt/requirements.txt
+
+%post
+    # CHTC builds: apt fails with "Couldn't create temporary file /tmp/apt.conf..." unless /tmp
+    # is writable first (CHTC's documented workaround; harmless elsewhere).
+    chmod 777 /tmp
+    # torch.compile (via Triton) needs a C compiler at run time; "runtime" images don't have one.
+    apt-get update -y && apt-get install -y --no-install-recommends gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+    python3 -m pip install --no-cache-dir -r /opt/requirements.txt
+    # The GPT-2 tokenizer files, inside the image, so jobs never need to download them.
+    TIKTOKEN_CACHE_DIR=/opt/tiktoken python3 -c "import tiktoken; tiktoken.get_encoding('gpt2')"
+    # A record of every installed version, for README tables and bug reports.
+    python3 -m pip freeze > /opt/versions.txt
+
+%environment
+    export TIKTOKEN_CACHE_DIR=/opt/tiktoken
+
+%test
+    # Runs at the end of the build. Needs no GPU: it checks that PyTorch is a CUDA build.
+    python3 - <<'PY'
+import shutil, torch, transformers, peft, datasets, tiktoken, yaml, numpy
+assert torch.version.cuda, "PyTorch is not a CUDA build"
+assert shutil.which("gcc"), "no C compiler (torch.compile needs one)"
+from torch.distributed.fsdp import fully_shard                       # recipe 3: FSDP2
+import torch.distributed.checkpoint as dcp; assert hasattr(dcp, "async_save")
+from transformers.models.olmo3 import Olmo3ForCausalLM               # recipe 3's model family
+import classad2, htcondor2.htchirp                                     # optional bindings
+print("OK: torch", torch.__version__, "CUDA", torch.version.cuda, "| transformers", transformers.__version__,
+      "| peft", peft.__version__, "| datasets", datasets.__version__)
+PY

@@ -2,6 +2,18 @@
 
 Read `CLAUDE.md` first. This recipe reuses the shared modules in `htcondor_ckpt/` (including the launcher wrapper from recipe 2) and must satisfy the full checkpointing contract, with the adaptations described below for sharded state.
 
+## Decisions (2026-10-28)
+
+| Decision | Why |
+|---|---|
+| **Style:** advanced content is fine, but easy to read and modify, like recipes 0 and 4. `train.py` in numbered sections listed in its docstring; each advanced feature (async save, the stop decision, resharding) in its own labeled section that says what it does, why, and what to change; FSDP/DCP mechanics in `torch_utils.py` helpers with plain names; plain-language README with tables, "Run it" steps and "Using it for your own model" | The user wants every recipe skimmable and modifiable by someone with a little knowledge. This is the advanced recipe that most beginners won't need, and the README says so up front |
+| **Model:** OLMo 3 7B base (`allenai/Olmo-3-1025-7B`, ~7.3B parameters, Apache-2.0, not gated); name in config | A different model family in each recipe (GPT, GPT-2, Qwen, OLMo). Fully open weights, data and code. Fallback: `allenai/OLMo-2-1124-7B`. Confirm the license and parameter count when writing `prepare_data.py` |
+| **Data:** a configurable random subset of the Tülu 3 SFT mixture (`allenai/tulu-3-sft-mixture`, ODC-BY), sized so one epoch takes a few hours on 4 GPUs | It's the data AI2 used for OLMo's own instruct models. Dolly-15k (recipe 4) would make an epoch take minutes. Alternative: SmolTalk (Apache-2.0) |
+| **Container:** the shared image `containers/recipes.def` (PyTorch 2.8 + CUDA 12.8, transformers 4.57.6, which is the first with OLMo 3) | One image for recipes 1–4. Recipe 0 keeps its own CPU image. transformers 5.x would mean also updating recipe 4's code |
+| **GPUs:** 4 × 80 GB (A100-80GB, H100, H200) by default, L40S (48 GB) only if measured to fit; resharding test on 2 × 80 GB | Estimated ~40–45 GB per GPU on 4 GPUs (16 bytes per parameter for weights, gradients and AdamW, plus activations), ~70 GB on 2. H200s aren't needed. `probes/gpu_machines.sh` shows which machines qualify |
+| **Measure the pool first:** P15 (parallel `/staging` writes and reads), `probes/gpu_comm/` (GPU-to-GPU speed), `probes/gpu_machines.sh` (machines, host memory, how often 4 GPUs are free) | The recipe's defaults (files per rank, save interval, whether a final save is normally attempted, `request_memory`, which GPUs) should rest on numbers |
+| **`/staging` quota:** the README keeps the footprint worksheet and the quota request | The maintainer has 1 TB, but a normal user has the default 100 GB, which one checkpoint (~88 GB) fills |
+
 ## Goal
 
 Full-parameter supervised fine-tuning of an open ~7–8B decoder model on an instruction dataset, sharded across the GPUs of one node with FSDP2, and checkpointed with PyTorch Distributed Checkpoint (DCP). The model itself is not the point. The point is that at this scale **checkpoints are large enough that both the 600 s vacate window and `/staging` storage become real engineering constraints.**
@@ -18,9 +30,9 @@ Full-parameter supervised fine-tuning of an open ~7–8B decoder model on an ins
 
 ## Model and data
 
-- Model: an open-weight ~7–8B model that does not require gated access, so users can run the recipe without extra approvals. Ask the user which model family CHTC prefers, and keep the model name a config value. Stage the weights on `/staging` ahead of time.
+- Model: OLMo 3 7B base (see Decisions), not gated, so users can run the recipe without extra approvals. Keep the model name a config value. Stage the weights on `/staging` ahead of time (a `prepare.sub` CPU job, as in recipe 4).
 - Load with Hugging Face `transformers` for convenience, then apply FSDP2 (`fully_shard`) per transformer block and to the root module. Use a bf16 mixed-precision policy with fp32 reduction where appropriate, and activation checkpointing (configurable). Comment why each choice is made.
-- Dataset: a standard open instruction-tuning dataset (ask the user; keep it configurable). `prepare_data.py` applies the model's chat template, tokenizes, masks prompt tokens out of the loss, and packs or buckets sequences into fixed-length blocks saved to disk.
+- Dataset: a subset of the Tülu 3 SFT mixture (see Decisions; keep it configurable). `prepare_data.py` applies a chat template (a base model may not ship one: then use the matching OLMo 3 instruct model's template, and say so), tokenizes, masks prompt tokens out of the loss, and packs or buckets sequences into fixed-length blocks saved to disk.
 - Training is framed in steps. Fine-tunes typically run 1–3 epochs. The README must state plainly that running many epochs of fine-tuning usually hurts quality, so users don't copy that pattern. Long wall time here comes from model size, not epoch count (estimated ~1–8 h per epoch on 4 GPUs, depending on the dataset).
 
 ## Memory sanity check
@@ -48,7 +60,7 @@ Write a short calculation in the README: 8B parameters × (bf16 weights + fp32 m
 
 ### The time-budget decision (central lesson, part 2)
 
-Measure, at full scale and on the real `/staging`:
+First, before the recipe exists: probe P15a (`probes/`) measures `/staging` with 1, 4 and 8 parallel writers and readers, using dummy data, so the defaults (files per rank, periodic interval, whether the final save is normally attempted) rest on numbers. Then measure, at full scale and on the real `/staging`:
 - `T_save`: wall time of a synchronous DCP save.
 - `T_async_block`: how long training is blocked by an async save before continuing.
 - Checkpoint size and file count.
@@ -60,6 +72,15 @@ Then implement the stop policy in `htcondor_ckpt/stop.py` as an explicit, docume
 - Else, skip the final save, log clearly how much work since the last periodic checkpoint will be redone, and exit 85.
 
 Write the measured numbers and the resulting recommendation into the README. If `T_save` is uncomfortably close to the budget, recommend a shorter periodic interval as the real protection, and say so plainly: on large jobs, periodic checkpoints carry the safety; the save made after SIGTERM is a bonus. Do not raise `job_max_vacate_time` above 600 s to make a save fit. It was honored on some slots in testing, but on backfill that time belongs to the GPU's owner.
+
+### Safety features for big jobs
+
+- **Collective timeout longer than the save.** A rank waiting at a barrier while another writes its shard must not time out. Set the timeout from the measured save time (recipe 2's 300 s is too short if a save takes 3–4 min), and keep the separate start-up communication check short.
+- **Never save a broken state over a good one.** If the loss (or gradient norm) is NaN or infinite, skip the save and stop with a clear message. Matters most with `keep_checkpoints: 1`.
+- **Space check before saving.** Before a save, check that the checkpoint directory has room for one more checkpoint (size of the last one). If not, say so clearly instead of leaving a half-written `.tmp`. P15 records whether free space on `/staging` reflects the user's quota; if it doesn't, document the limitation.
+- **Delete old checkpoints only after the new one is complete,** and log how long deleting takes (P15 measures it; ~88 GB may take a while).
+- **Load the base model without every rank holding a full copy in host memory** (4 × 15 GB). Load on one rank or on the `meta` device and fill shards from the weights; record peak host memory.
+- **Log per-rank save times** and peak host memory at every checkpoint.
 
 ## Resharding
 

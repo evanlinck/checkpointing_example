@@ -1,0 +1,11 @@
+# P15a - Parallel writes to /staging: how fast can a sharded checkpoint be saved and loaded?
+# @question: Recipe 3's checkpoint (~88 GB) is written by one process per GPU at once (PyTorch Distributed Checkpoint). How fast is /staging with 1, 4 and 8 writers, each writing 1 or 4 files (20 GB in total, with fsync)? How fast can the same number of processes read it back (a resume), how long does deleting it take (retention), and how much of the job's memory does the page cache use meanwhile? Also records what the machine offers a big job: CPUs, host memory, the job's memory limit, memlock limit, /dev/shm, network links, and whether free space on /staging reflects the user's quota.
+# @sites: chtc chtc_gpu
+# Writes 20 GB at a time (one configuration on disk at once): needs ~20 GB free in your /staging quota.
+# Run with --maxjobs 1, so two copies don't fill the quota together.
+# On chtc_gpu the probe never touches the GPU: it's there to land on a GPU machine, whose network
+# link to /staging is what a real recipe-3 job would use.
+TEST_REQS = (HasCHTCStaging =?= true)
+request_cpus   = 8
+request_memory = 16GB
+arguments = $(PROBE_ARGS) --mode pbench --pbench-target $(STAGING_RUNS)/$(Cluster).$(Process) --pbench-gb 20 --pbench-writers 1,4,8 --pbench-files 1,4 --pbench-read

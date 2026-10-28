@@ -1,0 +1,9 @@
+# P15b - P15a at recipe-3 scale (90 GB)
+# @question: Same as P15a with a checkpoint as large as recipe 3's (90 GB), 4 and 8 writers, 1 or 2 files each. Does the speed measured at 20 GB hold at full size, and does a full save fit well inside the 600 s vacate window?
+# @sites: chtc_gpu
+# @optin
+# Needs ~90 GB free in your /staging quota: request a larger quota first (the default is 100 GB).
+TEST_REQS = (HasCHTCStaging =?= true)
+request_cpus   = 8
+request_memory = 32GB
+arguments = $(PROBE_ARGS) --mode pbench --pbench-target $(STAGING_RUNS)/$(Cluster).$(Process) --pbench-gb 90 --pbench-writers 4,8 --pbench-files 1,2 --pbench-read --pbench-timeout 3600
