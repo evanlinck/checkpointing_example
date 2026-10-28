@@ -51,7 +51,11 @@ gpus_minimum_memory       = 20000
 # requirements            = (TARGET.BackfillSlot =?= true)
 
 # --- Resources ---
-request_cpus              = 4
+# Training uses under one CPU (measured: 0.3-0.7 while training; data comes from a memory-mapped
+# file, no DataLoader workers), so 2 leaves room and matches more slots. HTCondor sets
+# OMP_NUM_THREADS to this number, and PyTorch's main thread pool follows it. Some access points
+# hold jobs that use far more CPUs than requested (docs/environment.md §10).
+request_cpus              = 2
 request_memory            = 24GB
 request_disk              = 20GB
 
