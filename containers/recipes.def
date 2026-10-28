@@ -1,10 +1,14 @@
 # The shared GPU image for recipes 1-4: PyTorch 2.8 with CUDA 12.8, a C compiler for torch.compile,
 # and the packages in requirements.txt. (Recipe 0 keeps its own small CPU-only image.)
 #
-# Build it on CHTC with the build job next to this file (it puts the image on /staging):
-#   condor_submit build_image.sub -a "OUT_DIR = /staging/<user>/images"
-# or by hand, in an interactive build job (condor_submit -i build_image.sub):
-#   apptainer build ckpt-recipes-v1.sif recipes.def
+# Build it on CHTC with CHTC's build tool, on the access point, in this directory:
+#   mkdir -p /staging/<user>/images
+#   chtc-apptainer-build -d recipes.def -n ckpt-recipes-v1.sif -f requirements.txt -p file:///staging/<user>/images
+#   condor_submit apptainer-build.sub
+# The tool writes a build job (apptainer-build.sub/.sh); -s would also submit it. -f sends
+# requirements.txt along (the %files section below needs it). The build runs the %test section
+# at the end. To see every installed version afterwards:
+#   apptainer exec ckpt-recipes-v1.sif cat /opt/versions.txt     (in an interactive job)
 #
 # Jobs then use it with:
 #   container_image = osdf:///chtc/staging/<user>/images/ckpt-recipes-v1.sif

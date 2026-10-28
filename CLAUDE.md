@@ -35,7 +35,7 @@ The facts that shape everything below:
 
 - **Access point:** ap2002 (HTCondor 26.1). Execute points run 25.14.
 - **Scheduler:** HTCondor, vanilla universe.
-- **Containers:** Apptainer. Images live on `/staging` and are loaded with `container_image = osdf:///chtc/staging/<user>/...sif`, which works on CHTC and OSPool. Give rebuilt images new file names (OSDF caches by name). Build images in an interactive build job, not on the AP.
+- **Containers:** Apptainer. Images live on `/staging` and are loaded with `container_image = osdf:///chtc/staging/<user>/...sif`, which works on CHTC and OSPool. Give rebuilt images new file names (OSDF caches by name). Build images with CHTC's `chtc-apptainer-build` (it writes and can submit a build job), not on the AP.
 - **GPUs:** NVIDIA H200 (141 GB) are the target. GPU jobs use `request_gpus`, `+WantGPULab = true`, `+GPUJobLength` (short / medium / mediumlong / long = 12 / 24 / 72 / 168 h guarantee).
 - **OSPool:** reached from ap2002 with `want_ospool = true` and `requirements = (Poolname =!= "CHTC")`.
 - **Execute points have internet access** (CHTC and OSPool). Large datasets and weights should still be staged ahead of time, for speed and reproducibility.

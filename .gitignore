@@ -72,3 +72,9 @@ recipes/*/htcondor_ckpt/
 
 # Result files downloaded into a recipe directory for analysis
 recipes/*/results/
+
+# containers/: the build job chtc-apptainer-build writes, and its logs
+containers/apptainer-build.*
+containers/*.log
+containers/*.out
+containers/*.err
