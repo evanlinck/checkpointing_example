@@ -15,6 +15,9 @@ Typical use, checked once per training step:
     from stop import StopPolicy, EXIT_RESTART
 
     policy = StopPolicy(max_runtime_seconds=6 * 3600)   # OSPool: 4-6 h; CHTC backfill: 6-10 h
+    # On the OSPool, stop before the glidein's hard kill,
+    # and before the access point's per-execution limit, if either comes sooner:
+    #   seconds, source = runtime_limit(6 * 3600);  policy = StopPolicy(max_runtime_seconds=seconds)
     ...
     for batch in loader:
         train_step(batch)
@@ -134,6 +137,55 @@ def mark_restart_requested(note=""):
     if path:
         with open(path, "a") as f:
             f.write("pid=%d rank=%s %s\n" % (os.getpid(), os.environ.get("RANK", "-"), note))
+
+
+# --------------------------------------------------------------------- time limits
+DEFAULT_LIMIT_MARGIN = 900  # seconds before a hard limit to start the save that beats it
+
+
+def runtime_limit(max_runtime_seconds, machine_ad=None, job_ad=None, margin=DEFAULT_LIMIT_MARGIN, now=None):
+    """The runtime limit to give StopPolicy: max_runtime_seconds, or less if this execution
+    will be cut short sooner. Returns (seconds, source). Call it once, at start-up.
+
+    Two limits end an execution without a usable warning (docs/environment.md section 10):
+      - GLIDEIN_ToDie (machine ad): an OSPool glidein ends with a hard kill and no SIGTERM;
+        in our tests, 104-355 s after this time (P12a).
+      - AllowedExecuteDuration (job ad): some access points hold a job whose execution runs
+        longer (ap40: 20 h). Each exit-85 restart starts a new execution (P14a), so this
+        process's start is the execution's start.
+    `margin` must cover the save and the checkpoint's upload to the access point.
+    """
+    now = time.time() if now is None else now
+    machine_ad = machine_ad or os.environ.get("_CONDOR_MACHINE_AD")
+    job_ad = job_ad or os.environ.get("_CONDOR_JOB_AD")
+    limits = [(max_runtime_seconds, "max_runtime_seconds")] if max_runtime_seconds is not None else []
+    to_die = _ad_number(machine_ad, "GLIDEIN_ToDie")
+    if to_die is not None:
+        limits.append((to_die - now - margin, "GLIDEIN_ToDie - %.0f s" % margin))
+    execute = _ad_number(job_ad, "AllowedExecuteDuration")
+    if execute is not None:
+        limits.append((execute - margin, "AllowedExecuteDuration - %.0f s" % margin))
+    if not limits:
+        return (None, "none")
+    seconds, source = min(limits)
+    return (max(seconds, 0.0), source)
+
+
+def job_time_left(job_ad=None, margin=DEFAULT_LIMIT_MARGIN, now=None):
+    """Seconds left before the access point holds this job for its *total* run time, minus
+    `margin`, or None if it sets no such limit.
+
+    Some access points cap a job's total time (ap40: 14 days for self-checkpointing jobs).
+    It counts wall-clock time from the job's first start, across restarts, and the hold
+    (code 46) is not released automatically (P14b). A long run has to hand over to a new
+    job before then: save, end the job with the checkpoint copied out, resubmit.
+    """
+    job_ad = job_ad or os.environ.get("_CONDOR_JOB_AD")
+    allowed = _ad_number(job_ad, "AllowedJobDuration")
+    started = _ad_number(job_ad, "JobStartDate")
+    if allowed is None or started is None:
+        return None
+    return started + allowed - (time.time() if now is None else now) - margin
 
 
 # --------------------------------------------------------------------- vacate window
