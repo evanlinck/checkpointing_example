@@ -179,6 +179,93 @@ Single run per number; treat these as orders of magnitude.
 | ~~A real backfill eviction (P3e)~~ | Closed: observed in recipe 1's tests (section 3, "Observed"). Still unmeasured: the grace period on a real eviction, and SIGKILL timing for a job that doesn't exit | Optional: P3e on `chtc_backfill` (holds a GPU up to 6 h) |
 | `job_max_vacate_time` above 600 on backfill / GPU Lab | Whether a job's request is capped where retirement is short | P3c on `chtc_backfill` |
 | Effective vacate window from the ads at job start | Planned `vacate_budget()` helper | Log the estimate in probe starts; compare to P3 measurements |
-| OSPool glidein-end eviction | Whether OSPool jobs ever get SIGTERM in practice | Hard to test on demand; rely on timed exit-85 checkpoints |
+| ~~OSPool glidein-end eviction~~ | Closed by P12a (§10): no SIGTERM; a hard kill 104–355 s after `GLIDEIN_ToDie` | – |
 | `checkpoint_destination` + `ON_EXIT_OR_EVICT` | Whether the off-AP destination can also carry a SIGTERM save | One P6a variant |
 | GPU-enabled PyTorch image, GPU model on GPU Lab slots | Recipes target H200s; P0 did not record the device name | Build a CUDA image; read `GPUs_DeviceName` in the machine ad |
+
+## 10. Access points: spool, limits and policy (surveyed)
+
+Read-only survey with [`probes/ap_survey.sh`](../probes/ap_survey.sh) on 2026-10-23: **ap40** (`ap40.uw.osg-htc.org`, an OSPool access point, host `ospool-ap2140`) and **ap2002** (CHTC, which flocks to the OSPool). Both run HTCondor 26.1.0. Summaries: `results/ap-survey/{ospool-ap2140,ap2002}/summary.md`. These are configuration snapshots; other OSPool access points may be set differently, so the guidance tells users to check their own.
+
+### Configuration
+
+| | ap40 (OSPool) | ap2002 (CHTC) |
+|---|---|---|
+| `SPOOL` | `/var/lib/condor/spool`, own 1.9 TB filesystem, 3% used | same layout, 9% used |
+| `MAX_TRANSFER_INPUT_MB` | **5000, and users may not change it** (submit requirement `cant_change_maxtransferinputmb`) | −1 (no limit) |
+| `MAX_TRANSFER_OUTPUT_MB` | −1 | −1 |
+| `MAX_CONCURRENT_UPLOADS` / `DOWNLOADS` | 500 / 500; matchmaking is curbed above 500 waiting uploads | 500 / 100 |
+| Held jobs removed after | **30 days** (`SYSTEM_PERIODIC_REMOVE_LongHold`) | 90 days |
+| Time per execution | **20 h** (`JobDurationCategory = "Medium"`, the default) or 40 h (`"Long"`), via `AllowedExecuteDuration`; exceeding it holds the job (`JobExecuteExceeded`) | no transform |
+| Total time, self-checkpointing jobs | **14 days** (`AllowedJobDuration`, `CKPT_JOB_DURATION`); exceeding it holds the job (`JobDurationExceeded`) | no transform |
+| Excess CPU | **hold** after 1 h above 1.8 × `request_cpus` (`SYSTEM_PERIODIC_HOLD_CpuUsage`, code 26, subcode 102) | not configured |
+| Restart-count holds | `NumJobStarts > 10` / shadow exceptions > 10 hold a job, **except self-checkpointing jobs** | – |
+| `periodic_release` | capped at 4 holds by a transform | – |
+| `CHECKPOINT_DESTINATION_MAPFILE` | set, but the file doesn't exist | same |
+
+### Spool behavior (ap2002, `probes/spool_check/`, job 6965222)
+
+A job adding 1 MB to its checkpoint directory per exit 85, inspected while running and after it finished:
+- **Spool holds one copy of the checkpoint.** 4.19 MB checkpoint → 4.21 MB in the job's spool directory; 7.34 MB → 7.36 MB. Earlier checkpoints are not kept.
+- **A `cluster<C>.proc<P>.subproc0.tmp` directory sits beside it** (empty between uploads). New checkpoints are probably received there and swapped in, so the peak may briefly be twice the checkpoint. Not yet measured (P9a).
+- **Spool is freed when the job finishes.** After exit 0, the job's spool directory no longer existed.
+- **Users can see their own spool use.** The job's directories are owned by the user (`JOB_SPOOL_PERMISSIONS = user` on both APs) under world-readable parents: `du -sb $(condor_config_val SPOOL)/<cluster mod 10000>/<proc>/`. Without file access, `TransferOutputStats.CedarSizeBytesLastRun` in the job ad gives the size of the last checkpoint upload. (`DiskUsage` is the execute-side sandbox, not spool.)
+
+### Glideins (OSPool collector, as seen from ap40)
+
+- **For 83% of slots, `GLIDEIN_ToDie − GLIDEIN_ToRetire` = 10 h** (34,288 of 41,404 slots with both values). A glidein stops accepting jobs 10 h before it is killed, so a job normally gets about 10 h or more on a glidein. `GLIDEIN_Max_Walltime` was 71.5 h on the slot inspected.
+- `GLIDEIN_ToDie` and `GLIDEIN_ToRetire` are in the machine ad.
+- **The slot's `MaxJobRetirementTime` is −1 on memory overuse** (immediate eviction); disk overuse counts only on data slots (`IsDataSlot`). `SiteWMS_WN_Preempt` was false on the sites listed.
+- **Multi-GPU slots are scarce** (slot counts, one snapshot): A40 × 4 (42), RTX A5000 × 4 (12), RTX 3060 × 4 (7), L40 × 2 (6), H100 × 2 or 3 (8), plus about 200 2–4-GPU slots without a device name. Most GPU slots have one GPU.
+
+### Job history, last 30 days
+
+| | ap40: jobs | interrupted ≥ 1× | ap2002: jobs | interrupted ≥ 1× |
+|---|---|---|---|---|
+| CPU, self-checkpointing | 226,818 | 12.8% | 177,595 | 9.6% |
+| GPU, self-checkpointing | 554 | 38.6% | 3,854 | 16.0% |
+
+ap2002 mixes CHTC and OSPool runs (`ap_survey.sh` now records `MachineAttrGLIDEIN_Site0` to separate them). "Interrupted" counts executions beyond the first, from `NumJobStarts`, which doesn't count in-place exit-85 restarts (§2).
+
+- **On ap40, the excess-CPU hold dominates for self-checkpointing jobs.** `SystemPolicy` holds: 13,353 on CPU jobs, and **484 on the 554 GPU jobs**. 107 of 166 held checkpointing jobs in the queue were held for it. Sample messages: "Job used 22 CPUs, while request_cpus=4". How many users this covers is not known yet (the survey now counts distinct submitters among held jobs).
+- **Other ap40 holds:** `MaxTransferInputSizeExceeded` (4,502 on CPU jobs that don't checkpoint; 2 on GPU self-checkpointing jobs) and `JobExecuteExceeded` (3,255 on CPU jobs that don't checkpoint).
+- **Interruptions of self-checkpointing jobs on ap40,** by `NumVacatesByReason`: `ClaimDeactivated` 14,533 (likely the rescheduled exit-85 restarts of §5), `StartdShutdown` 6,357 (glidein or machine ends), and `StarterError` 6,272.
+- **On ap2002, failed checkpoint uploads dominate.** The most common hold of self-checkpointing CPU jobs was `TransferOutputError` (18,489). Jobs held in the queue include code 12 subcode 2 ("file not found", the P8a failure) left on hold 44–55 days.
+- **What a PyTorch GPU job actually uses (recipe 1, 2026-10-23,** `train.py`'s new `CPU threads` and `CPUs used` lines; `request_cpus = 4`, no DataLoader workers):
+  - **HTCondor sets `OMP_NUM_THREADS` to `request_cpus` (4) on CHTC and the OSPool, and PyTorch's main thread pool follows it** (`torch.get_num_threads()` = 4). The inter-op pool is not capped: it was the machine's full size (192 on a CHTC L40S machine; 64 usable of 128 on an OSPool H100 machine at NCSU).
+  - **Measured use was 0.34 CPUs while training on CHTC, and 0.52–0.70 on the OSPool,** far below the 1.8 × 4 = 7.2 that ap40's hold needs. These averages count child processes once they exit, so `torch.compile`'s worker pool is only partly counted; it works during start-up, not during training.
+  - So the excess-CPU holds come from something PyTorch's defaults don't do on their own: DataLoader workers, a process pool, other libraries' thread pools, or CPU-side work. Recipe 2 also uses no DataLoader workers.
+- **Transfer queue on ap40:** a peak of 257 uploads waiting (the limit is 500); about 440 MB/s sent to jobs averaged over a day.
+
+### Input limits, glidein ends and OSDF backups (probes, 2026-10-26)
+
+Run tags `ospool-r4` (P11d, P13; chtc and ospool from ap2002) and `glidein-end` (P12a; ospool). Summaries: `results/{ospool-r4,glidein-end}/summary.md`.
+
+- **A checkpoint restored on a new host counts against the input-size limit (P11d).**
+  - The setup: `max_transfer_input_mb = 50`, a 100 MB spooled checkpoint, then `condor_vacate_job`.
+  - The probe saved after SIGTERM and exited 85, as usual. But the restart in a new sandbox was **held**: *"sending file …/spool/…/ckpt/step_…/payload_000.bin: max total upload bytes exceeded (max=50 MB …)"*. Same result on CHTC (bare and container) and the OSPool.
+  - With a 200 MB limit, the same jobs resumed from the SIGTERM save.
+  - Restarts in place after a planned exit 85 re-transfer nothing, so they aren't affected. **The hold appears only after an eviction**, possibly days into a run.
+  - On ap40 (`MAX_TRANSFER_INPUT_MB = 5000`, locked), a job whose spooled checkpoint, plus its other plain inputs, is over ~5 GB can't be restored after an eviction.
+- **`osdf://` inputs don't count against it (P11d).** A 100 MB `osdf://` input ran under a 50 MB limit, with and without a container. A job with a container image read through OSDF also started normally under the 50 MB limit. Large base-model weights and containers read through OSDF are therefore unaffected.
+- **A glidein end is a hard kill without warning, shortly after `GLIDEIN_ToDie` (P12a).** Five jobs ran on OSPool glideins until those ended:
+  - sites: UChicago (2), FANDM-ITS, Michigan and BEOCAT-SLATE;
+  - each started 9.7–10.5 h before `ToDie`;
+  - **none received SIGTERM**: each was killed **104–355 s after `ToDie`**, by its last heartbeat (5 s apart, streamed to the AP);
+  - each was rescheduled to another host 34–70 s later.
+  
+  So `GLIDEIN_ToDie` in `$_CONDOR_MACHINE_AD` is a dependable deadline: a timed checkpoint that ends before it loses nothing. `htcondor_ckpt.stop.runtime_limit()` uses it.
+- **`transfer_output_remaps` to `osdf://` applies only at the job's final exit (P13).**
+  - The setup: a directory in both `transfer_checkpoint_files` and `transfer_output_files`, remapped to `osdf:///chtc/staging/...`.
+  - It was restored normally at each in-place restart.
+  - It reached OSDF **only when the job ended**: all three files (from steps 30, 60, 90) arrived together, 3 s after exit 0, and none at the two exits 85. Same on CHTC and the OSPool.
+  - So HTCondor won't make OSDF backups at timed checkpoints. A job can still hand its checkpoint to OSDF by *ending*, and a new job can resume from it.
+- **Ending with exit 86 works the same (P13b, run tag `handoff`, 2026-10-27).** The job left the queue with "Normal termination (return value 86)", with no hold and no requeue. The remapped directory reached OSDF 3–8 s after the exit, on CHTC and the OSPool. A dedicated code can therefore mean "continue in a new job", keeping exit 0 for "training finished".
+- **Each exit-85 restart starts a new execution for `AllowedExecuteDuration` (P14a, run tag `timecaps`, 2026-10-27).** With `allowed_execute_duration = 150` and an exit 85 every 60 s, the job ran 6 minutes to completion, never held, on CHTC and the OSPool. A timed checkpoint shorter than the cap (ap40: 20 h) keeps a job under it.
+- **`AllowedJobDuration` counts wall-clock time from the job's first start, across restarts (P14b).**
+  - With `allowed_job_duration = 240` and exits every 60 s, the job was held **240 s after its first start**.
+  - The message: "The job exceeded allowed job duration of 04:00", **code 46**. ap40's release transform excludes codes 46 and 47, so such a hold is not released automatically.
+  - The job ad at start had `JobStartDate` and `AllowedJobDuration`. Their sum came 14 s before the hold, so a job can compute its own deadline (`htcondor_ckpt.stop.job_time_left()`).
+  - `JobStartDate` is when HTCondor started the job, a few seconds to minutes before the program ran (input transfer, container).
+  - On ap2002, jobs get `AllowedExecuteDuration = 259200` (72 h) when they set none.
+
