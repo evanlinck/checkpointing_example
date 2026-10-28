@@ -1,0 +1,12 @@
+# P13 - Can HTCondor copy a checkpoint backup to OSDF at each exit 85?
+# @question: A directory listed in transfer_checkpoint_files and remapped to osdf:// with transfer_output_remaps: does HTCondor upload it at every exit 85 (a backup that outlives the job, OSPool's advised path for large outputs), only at the end, or not at all? Does the job still resume normally?
+# @sites: chtc ospool
+# The probe writes backup/state_<step>.json at each save (a new name each time: OSDF caches by
+# name). Voluntary exits at steps 30 and 60, final exit at 90. analyze.py lists what arrived in
+# $(STAGING_DIR)/ckpt-probes/p13/<job>/ (the AP reads /staging directly) and when.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt, backup
+transfer_output_files     = ckpt, out, backup
+transfer_output_remaps    = "backup = $(OSDF_STAGING)/p13/$(Cluster).$(Process)/backup"
+stream_output = true
+arguments = $(PROBE_ARGS) --voluntary-exit-at 30,60 --backup-dir backup --total-steps 90

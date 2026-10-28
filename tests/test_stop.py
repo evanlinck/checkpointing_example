@@ -4,7 +4,7 @@ import signal
 import pytest
 
 from htcondor_ckpt import stop
-from htcondor_ckpt.stop import StopPolicy, vacate_budget
+from htcondor_ckpt.stop import StopPolicy, job_time_left, runtime_limit, vacate_budget
 
 
 class Clock:
@@ -130,3 +130,40 @@ def test_eviction_replaces_a_pending_timed_stop(tmp_path):
     f.write_text("")                      # a later stop file doesn't replace the signal
     p.should_stop()
     assert p.reason == "signal"
+
+
+def test_runtime_limit_shortened_by_glidein_end(tmp_path):
+    m = write_ad(tmp_path / "machine", GLIDEIN_ToDie="100000", GLIDEIN_Site='"UChicago"')
+    j = str(tmp_path / "no-job-ad")
+    # 10 h of glidein left, minus the 900 s margin, is less than a 12 h limit
+    assert runtime_limit(12 * 3600, m, j, now=100000 - 36000) == (36000 - 900, "GLIDEIN_ToDie - 900 s")
+    # ... but more than a 5 h limit, which is kept
+    assert runtime_limit(5 * 3600, m, j, now=100000 - 36000) == (5 * 3600, "max_runtime_seconds")
+    # no limit of our own: the glidein's
+    assert runtime_limit(None, m, j, margin=600, now=99000) == (400, "GLIDEIN_ToDie - 600 s")
+    # already past the deadline: stop at the first step
+    assert runtime_limit(3600, m, j, now=99950)[0] == 0
+
+
+def test_runtime_limit_from_allowed_execute_duration(tmp_path):
+    m = str(tmp_path / "no-machine-ad")
+    j = write_ad(tmp_path / "job", AllowedExecuteDuration="20 * 3600")       # ap40 Medium
+    assert runtime_limit(24 * 3600, m, j) == (20 * 3600 - 900, "AllowedExecuteDuration - 900 s")
+    assert runtime_limit(6 * 3600, m, j) == (6 * 3600, "max_runtime_seconds")
+
+
+def test_runtime_limit_without_limits(tmp_path, monkeypatch):
+    m = write_ad(tmp_path / "machine", MachineMaxVacateTime="600")      # CHTC: no GLIDEIN_ToDie
+    j = write_ad(tmp_path / "job", JobStartDate="1000")
+    assert runtime_limit(3600, m, j) == (3600, "max_runtime_seconds")
+    assert runtime_limit(None, m, j) == (None, "none")
+    monkeypatch.delenv("_CONDOR_MACHINE_AD", raising=False)
+    monkeypatch.delenv("_CONDOR_JOB_AD", raising=False)
+    assert runtime_limit(3600) == (3600, "max_runtime_seconds")
+
+
+def test_job_time_left(tmp_path):
+    j = write_ad(tmp_path / "job", JobStartDate="1000", AllowedJobDuration="14 * 24 * 3600")
+    assert job_time_left(j, margin=0, now=1000 + 86400) == 13 * 86400
+    assert job_time_left(j, now=1000) == 14 * 86400 - 900
+    assert job_time_left(write_ad(tmp_path / "j2", JobStartDate="1000")) is None

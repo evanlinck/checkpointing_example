@@ -1,6 +1,6 @@
 # Probe results
 
-Summaries from the probe runs in [`../probes/`](../probes/), cited by [`../docs/environment.md`](../docs/environment.md) by run tag. Only the Markdown summaries are kept in git. The raw job files (`job.out`, `job.log`, ads, checkpoints) stay on the maintainer's machine and on ap2002.
+Summaries from the probe runs in [`../probes/`](../probes/) and the access point survey ([`../probes/ap_survey.sh`](../probes/ap_survey.sh)), cited by [`../docs/environment.md`](../docs/environment.md) by run tag. Only the Markdown summaries are kept in git. The raw job files (`job.out`, `job.log`, ads, checkpoints) stay on the maintainer's machine and on ap2002.
 
 | Tag | Date | Sites | Tests |
 |---|---|---|---|
@@ -14,6 +14,11 @@ Summaries from the probe runs in [`../probes/`](../probes/), cited by [`../docs/
 | `torchrun` | 2026-10-02 | chtc | P7e, P7f |
 | `torchrun2` | 2026-10-02 | chtc | P7g, P7h first attempt |
 | `torchrun3` | 2026-10-02 | chtc | P7h |
+| `ap-survey` | 2026-10-23 | ap40 (OSPool), ap2002 | `ap_survey.sh`: access point configuration, spool, held jobs, glideins, GPUs, 30 days of job history (no jobs submitted). `ap2002-job*/`: one job's spool, inspected while running |
+| `ospool-r4` | 2026-10-26 | chtc, ospool | P11d (input-size limit), P13 (OSDF remaps at exit 85) |
+| `glidein-end` | 2026-10-26 | ospool | P12a (what happens when a glidein ends), 5 copies |
+| `handoff` | 2026-10-27 | chtc, ospool | P13b (exit 86 with OSDF remaps) |
+| `timecaps` | 2026-10-27 | chtc, ospool | P14a–b (`allowed_execute_duration`, `allowed_job_duration`) |
 
 **Reading the `torchrun` reports** (`p7-rerun` P7e, `torchrun`, `torchrun2`, `torchrun3`): `analyze.py` assumes one process per execution. With two workers per execution, its "Restart after …" lines (negative gaps, "restored step None") and some "SIGTERM save was LOST" or "NO signal" verdicts are wrong. For example, in `torchrun3` the wrapper received SIGTERM and the workers deliberately never did. The correct readings, taken from the raw timelines, are in `docs/environment.md` §6:
 - **P7g:** workers finished a 60 s save after SIGTERM.

@@ -4,6 +4,7 @@
 # REQUIRED first:  export PROBE_STAGING_DIR=/staging/<username>   (your /staging directory)
 #
 #   bash setup.sh dirs                 on ap2002: create the /staging directories
+#   bash setup.sh blobs                on ap2002: a 100 MB test file for P11d (read through OSDF)
 #   bash setup.sh build [--with-torch] inside an interactive build job (see build.sub):
 #                                      build the container image(s) into /staging
 #
@@ -23,6 +24,14 @@ case "${1:-}" in
     mkdir -p "$STAGING/images" "$STAGING/runs"
     echo "Created $STAGING/{images,runs}"
     ;;
+  blobs)
+    # P11d asks whether osdf:// inputs count against max_transfer_input_mb. OSDF caches by name,
+    # so the file is never rewritten: a new size would get a new name.
+    mkdir -p "$STAGING/blobs"
+    f="$STAGING/blobs/blob-100mb-v1.bin"
+    [ -f "$f" ] || head -c 104857600 /dev/urandom > "$f"
+    ls -l "$f"
+    ;;
   build)
     mkdir -p "$STAGING/images"
     # A plain Python image: probe.py needs nothing beyond the standard library.
@@ -38,5 +47,5 @@ case "${1:-}" in
     ls -lh "$STAGING/images"
     ;;
   *)
-    sed -n '2,10p' "$0"; exit 1 ;;
+    sed -n '2,11p' "$0"; exit 1 ;;
 esac

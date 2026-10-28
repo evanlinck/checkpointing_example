@@ -29,6 +29,45 @@ Before anything else (after data preparation), run a few hundred steps on 1 and 
 
 These numbers set the defaults below that are marked "after the smoke run".
 
+**Measured (2026-10-22):** 200 steps each, `job.sub` with `max_steps=200`; all GPUs were A100-SXM4-80GB, `micro_batch` 32, `torch.compile` on.
+
+| | 1 GPU | 4 GPUs |
+|---|---|---|
+| Throughput, steady | 206.5k tokens/s | ~740k tokens/s (670–800k): 3.6×, ~90% scaling |
+| Peak GPU memory per rank | 22.8 GB | 22.8 GB |
+| Process start → first step | 25.0 s | 26.8 s |
+| Time reading shards from `/staging` | 0–1% | 0–2% |
+| Final save (1,494 MB, 2 files, to `/staging`) | 5.13 s | 5.01 s |
+| Val loss at step 200 | 6.3194 | 6.3262 (difference 0.0068) |
+
+- **Full run** (18,892 steps, 9.9B tokens, 106 shards): ~13 h on 1 A100, **~3.7 h on 4 A100s**. Faster GPUs shorten it further.
+- **`gpus_minimum_memory = 30000M`:** 22.8 GB plus headroom. With `gpus_minimum_capability = 8.0` (bf16).
+- **Data:** reading the shards directly from `/staging` doesn't limit training, so no prefetching is needed.
+
+## Full run (2026-10-22, `job.sub`, 4 × L40S on a backfill slot)
+
+| | |
+|---|---|
+| Result | 18,892 steps, 9.90B tokens, exit 0; **val loss 3.0424** (`loss_curve.png`) |
+| Wall time | 6.28 h in 6 executions: 5 timed exits (1 h demo interval), no evictions |
+| Throughput | median 491k tokens/s (p10–p90: 423–525k). The 4-A100 (NVLink) smoke run did ~740k. With `NCCL_P2P_LEVEL=NVL`, the L40S's gradient exchange goes through host memory, which probably accounts for part of the difference |
+| Peak GPU memory | 22.8 GB per rank (fresh start), 23.8 GB after a resume |
+| Data | 0.1% of the time reading shards from `/staging` (median) |
+| Saves | 1.5 GB in 4.9–6.7 s (timed, periodic and final) |
+
+**Cost of one timed checkpoint** (from `metrics.jsonl`; restarts in place):
+
+| Step | Save | Exit → new process | Process start → first step | Total |
+|---|---|---|---|---|
+| 3,337 | 5.2 s | 7.8 s | 21.6 s | 34.6 s |
+| 6,365 | 5.0 s | 7.1 s | 20.8 s | 32.9 s |
+| 9,609 | 4.9 s | 7.4 s | 25.4 s | 37.7 s |
+| 12,757 | 4.9 s | **1,078 s** | 32.3 s | 1,115 s |
+| 15,862 | 6.7 s | 7.9 s | 24.2 s | 38.8 s |
+
+- **The cost:** typically **33–39 s, about 1% of the 1 h demo interval**, or 0.2% of a real 6 h one.
+- **The one exception (step 12,757):** HTCondor rescheduled instead of restarting in place (`004 … Code 1025`, as in `docs/environment.md` §5), and the job restarted on the same machine 18 minutes later. That single gap cost more than all the other restarts together.
+
 ## Data
 
 - Dataset: FineWeb-Edu, the `sample-10BT` subset (`HuggingFaceFW/fineweb-edu`). Confirm with the user before downloading. The tokenized output is ~20 GB as `uint16`.
@@ -55,14 +94,14 @@ At 10B tokens the natural unit is tokens or steps, and a single pass over the da
 - All ranks load the checkpoint (mapped to their own device). Use `dist.barrier()` around save and load where needed, and comment why.
 - Checkpoint size will be roughly 1.5 GB (fp32 weights + two AdamW moments). Measure save time and size.
 - **Storage:** `/staging` mode is the default (in-place periodic saves every 30 min are durable at once). Spool mode is a documented alternative: a 1 GB checkpoint added only ~5 s to an exit-85 restart (§7), and `ON_EXIT_OR_EVICT` keeps the save made after SIGTERM. Measure it, and state when spool stops being reasonable.
-- **Timed exit: every 2 hours, as a demonstration value.** `max_runtime_seconds` defaults to 7200 so the full run crosses several timed exits, which is the workflow this recipe exists to show. The config comment, submit file and README say plainly that this is shorter than you'd use for real work, and repeat CHTC's guidance: 6–10 h on backfill, 4–6 h on the OSPool (up to 8). After the smoke run, check that the full run spans **at least 2 intervals**. If 4 GPUs finish 10B tokens in under ~4 h, shorten the demo interval so it still does, and say why. The timed exit goes through the same rank agreement as the stop flag.
+- **Timed exit: every hour, as a demonstration value.** `max_runtime_seconds` defaults to 3600 so the full run crosses several timed exits, which is the workflow this recipe exists to show. The config comment, submit file and README say plainly that this is shorter than you'd use for real work, and repeat CHTC's guidance: 6–10 h on backfill, 4–6 h on the OSPool (up to 8). The full run must span **at least 2 intervals**. Originally 2 h; the smoke run measured ~3.7 h for the full run on 4 A100s (less on faster GPUs), which would have given at most one timed exit, so the interval became 1 h (2026-10-22). The timed exit goes through the same rank agreement as the stop flag.
 - **Cost of one timed checkpoint:** recipe 1's measured breakdown (`docs/01-tinystories-gpt.md`) is the baseline:
   - save 2.5–4.4 s for 615 MB;
   - spool transfer ≤ 2 s;
   - ~4 s until HTCondor restarts the job in place;
   - start-up ~11 s in place, ~19 s in a fresh sandbox (whose `torch.compile` cache is empty).
 
-  Recipe 2 measures the same parts with `torchrun`, 4 ranks and a 1.5 GB checkpoint, and reports the total against the 2 h interval and against a real 6 h one.
+  Recipe 2 measures the same parts with `torchrun`, 4 ranks and a 1.5 GB checkpoint, and reports the total against the 1 h interval and against a real 6 h one.
 - **Stop agreement:** `torch_utils.agree(flag)` all-reduces the local stop flag (`MAX`) every K steps (configurable, default every step; negligible next to a 0.5M-token step). The flag comes from the signal *or* the stop file. Whichever rank sees it first makes all ranks stop at the same step. Agree on the *reason* too (signal beats timed), so every rank logs and saves the same one.
 
 ## Launching
@@ -97,7 +136,7 @@ Follow recipe 1's submit files (every line commented in `job.sub`):
   - the `shell` line above, with `ckpt_dir` and `out_dir` under `/staging/<user>/<run_name>/`, and `data_dir` pointing at the shards;
   - `checkpoint_exit_code = 85`, `kill_sig = SIGTERM`, `requirements = (HasCHTCStaging =?= true)`;
   - `container_image = osdf:///chtc/staging/<user>/<path>/recipe1.sif`;
-  - `request_gpus = 4` (parameterized), `gpus_minimum_memory` (after the smoke run: peak memory per rank plus headroom), `+WantGPULab = true`, `+GPUJobLength = "short"` (each execution ends within the 2 h interval, far below the 12 h guarantee), `+is_resumable = true`;
+  - `request_gpus = 4` (parameterized), `gpus_minimum_memory` (after the smoke run: peak memory per rank plus headroom), `+WantGPULab = true`, `+GPUJobLength = "short"` (each execution ends within the 1 h interval, far below the 12 h guarantee), `+is_resumable = true`;
   - CPUs and memory: start from recipe 1's per-GPU numbers (4 CPUs, 24 GB host memory for 1 GPU, which was plenty) and scale; adjust after measuring. Smaller requests match sooner, and a 4-GPU slot is already the hard part.
   - `transfer_input_files`: the code and `htcondor_ckpt` only. The data is read from `/staging`.
 - `job_spool.sub`: the documented spool alternative (recipe 1's four spool lines, with `checkpoints, outputs`).
@@ -137,19 +176,19 @@ Follow recipe 1's submit files (every line commented in `job.sub`):
 
 ## Acceptance criteria
 
-- [ ] Data preparation runs as an HTCondor job and resumes correctly if interrupted.
-- [ ] The throughput smoke run on 1 and 4 GPUs is recorded, and the defaults that depend on it are set:
+- [ ] Data preparation runs as an HTCondor job and resumes correctly if interrupted. (Ran as an HTCondor job: 106 shards + val, 2026-10-21. Resuming tested locally with a simulated interruption; not yet interrupted on HTCondor.)
+- [x] The throughput smoke run on 1 and 4 GPUs is recorded, and the defaults that depend on it are set:
   - the micro-batch;
   - `gpus_minimum_memory`;
-  - the demo interval, if it needs to be shorter than 2 h.
-- [ ] A short run (a few hundred steps) on 2+ GPUs matches the same run on 1 GPU with equivalent global batch size, by `compare_runs.py`'s rule.
-- [ ] Local SIGTERM test on a multi-GPU node, sending the signal to the top process only as HTCondor does: all ranks stop at the same step, rank 0 saves, the job exits 85, and resume continues from the saved step and data position.
-- [ ] A save that takes longer than 30 s completes under the wrapper. Under plain `exec torchrun` with this image (torch 2.8) it is killed, and exit 85 becomes 1: re-measured and recorded in `docs/environment.md` §6.
-- [ ] Resume-equivalence test on a reduced run (e.g. 2,000 steps, 3 interruptions) against two references, with a plot in the README.
-- [ ] HTCondor tests on GPU Lab slots: a timed exit 85, `condor_vacate_job`, hold + release, and `-fast`. Logs from all ranks show a clean, coordinated stop.
-- [ ] One run on a backfill slot, with `request_gpus = 2` (or 1): 4 free GPUs on one backfill machine are rare. `BackfillSlot = true` confirmed in the machine ad.
-- [ ] A full-length run (10B tokens, 4 GPUs, 2 h timed exits) completes across multiple HTCondor executions, producing one continuous loss curve with restart points marked (`plot_run.py`).
-- [ ] Measured throughput, checkpoint size, save time, the cost of one timed checkpoint (save, transfer, restart, `torchrun` + compile start-up) and the `/staging` footprint recorded in the README.
+  - the demo interval (shortened to 1 h).
+- [ ] A short run (a few hundred steps) on 2+ GPUs matches the same run on 1 GPU with equivalent global batch size, by `compare_runs.py`'s rule. (Informally: 1 vs 4 A100s, val loss 0.0068 apart at step 200, within 0.01; the two-reference comparison is still to do.)
+- [x] Local SIGTERM test on a multi-GPU node, sending the signal to the top process only as HTCondor does: all ranks stop at the same step, rank 0 saves, the job exits 85, and resume continues from the saved step and data position. (`test_local.py --ddp`, 2 CPU ranks, exact losses after resume; and on 2 H200s under HTCondor, `test_htcondor.sh vacate`, 2026-10-22.)
+- [ ] A save that takes longer than 30 s completes under the wrapper. Under plain `exec torchrun` with this image (torch 2.8) it is killed, and exit 85 becomes 1: re-measured and recorded in `docs/environment.md` §6. (Done locally: 2 CPU ranks, torch 2.8. Not yet on GPUs.)
+- [x] Resume-equivalence test on a reduced run (e.g. 2,000 steps, 3 interruptions) against two references, with a plot in the README. (2026-10-23, 300 steps, 2 GPUs: two uninterrupted references on H100s differed by up to 0.0061 in val loss; a run with 5 restarts (4 timed, 1 `condor_vacate_job`) on A100-SXM4-40GB differed from them by up to 0.0090, within the allowed 0.0122 (twice the noise floor). `resume_equivalence_gpu.png`; README pending.)
+- [x] HTCondor tests on GPU Lab slots: a timed exit 85, `condor_vacate_job`, hold + release, and `-fast`. Logs from all ranks show a clean, coordinated stop. (2026-10-22, 2 GPUs each: `vacate` and `-fast` pass on H200s, with 2 timed exits each, which cover the timed-exit test. `hold` passes: held on L40S, released and resumed on A100-SXM4-40GB, i.e. across GPU types. One start-up after the release took 194 s to the first step, against 21–31 s everywhere else; cause unknown.)
+- [x] One run on a backfill slot, with `request_gpus = 2` (or 1): 4 free GPUs on one backfill machine are rare. `BackfillSlot = true` confirmed in the machine ad. (`vacate` and `-fast` ran on a `backfill1_*` slot with 2 H200s; `backfill1_*` slots report `BackfillSlot = true` (condor_status, recipe 1). A 2-GPU `comm` run on an L40 backfill slot was evicted by its owner: `Code 1011`, and the save after SIGTERM worked.)
+- [x] A full-length run (10B tokens, 4 GPUs, 1 h timed exits) completes across multiple HTCondor executions, producing one continuous loss curve with restart points marked (`plot_run.py`). (4 × L40S, 6 executions, val loss 3.0424; see "Full run".)
+- [ ] Measured throughput, checkpoint size, save time, the cost of one timed checkpoint (save, transfer, restart, `torchrun` + compile start-up) and the `/staging` footprint recorded in the README. (Measured: see "Full run"; README pending.)
 
 ## User-facing README outline
 
@@ -157,6 +196,6 @@ Follow recipe 1's submit files (every line commented in `job.sub`):
 2. Quick start: prepare data (CPU job), submit training, monitor.
 3. Why every rank must agree to stop, with a short diagram of the deadlock that happens otherwise.
 4. How the stop request reaches your training processes: what HTCondor signals, what `torchrun` does with it, and how the wrapper fixes it (measured, with this image's torch version).
-5. Choosing the timed-exit interval: why this recipe uses 2 h (to show the workflow) and what to use for real runs.
+5. Choosing the timed-exit interval: why this recipe uses 1 h (to show the workflow) and what to use for real runs.
 6. Results: continuous loss curve with restart markers, resume-equivalence plot, throughput table.
 7. Adapting this to your own DDP code: a checklist (including `accelerate`/`deepspeed` launchers).

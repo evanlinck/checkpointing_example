@@ -23,6 +23,11 @@
 # Each spool test gets its own <test name>.checkpoints/ and <test name>.outputs/ here, so tests
 # running at the same time don't overwrite each other's results.
 #
+# Tests can wait in the queue for a long time. To keep one running after you log out, start it
+# with nohup and read its output file later (the last line is PASS or FAIL):
+#   nohup ./test_htcondor.sh job_chtc.sub vacate > vacate_run.txt 2>&1 &
+# If you stop a script part-way, its job stays in the queue: condor_rm it before testing again.
+#
 # Your locations come from environment variables, so no personal path is stored in the repo:
 #   export RECIPE1_IMAGE=osdf:///chtc/staging/<user>/<path>/recipe1.sif
 #   export RECIPE1_DATA_DIR=/staging/<user>/tinystories      # where prepare_data.py wrote train.bin / val.bin
@@ -75,6 +80,23 @@ submit() {   # submit $SUB with the test settings; prints the job id. $1 = name 
 }
 wait_running() { until grep -q "^001 " "$1.log" 2>/dev/null; do sleep 15; done; }
 
+# Interrupt only while the job is training. With a timed exit every 2 minutes the job restarts often,
+# and a vacate or hold sent while it is saving for a timed exit, or in the seconds between two
+# executions, finds nothing to save: the job resumes from an earlier save and the test fails for no
+# real reason. The job's output is streamed back (stream_output), so wait for one of the first few
+# training-step lines after a (re)start: then the next timed exit is a minute or more away.
+wait_training() {   # $1 = how many step lines after a (re)start still count as "early"
+  echo "waiting until the job is early in an execution, training (not saving or restarting)..."
+  for _ in $(seq 240); do
+    local lines; lines=$(grep -E "^(step [0-9]+|SAVED|RESUMED|STARTING|launch.py|DONE)" "$TAG.out" 2>/dev/null || true)
+    local since; since=$(echo "$lines" | awk '/^(RESUMED|STARTING)/ {n = 0; started = 1; next} /^step / {n++; next} {n = -1} END {print (started ? n : -1)}')
+    if [ "$since" -ge 1 ] && [ "$since" -le "$1" ]; then return 0; fi
+    if grep -q "^005 " "$TAG.log"; then return 0; fi    # the job ended: the check below reports it
+    sleep 5
+  done
+  echo "(never saw an early training step; interrupting anyway)"
+}
+
 job=$(submit "$TAG")
 echo "submitted $job ($MODE); event log: $TAG.log"
 wait_running "$TAG"
@@ -88,6 +110,7 @@ if grep -q "^005 " "$TAG.log"; then
   echo "--- end of $TAG.err ---"; tail -5 "$TAG.err"
   exit 1
 fi
+[ "$MODE" != timed ] && [ "$MODE" != reference ] && wait_training 5   # a step line every 50 steps (~5-10 s)
 
 case "$MODE" in
   timed|reference) ;;
@@ -112,7 +135,24 @@ case "$MODE" in
           condor_rm "$job"
           until grep -q "^009 " "$TAG.log"; do sleep 15; done
           TAG="${TAG}_resubmitted"
-          job=$(submit "$TAG")
+          # Interrupt only while the job is training. With a timed exit every 2 minutes the job restarts often,
+# and a vacate or hold sent while it is saving for a timed exit, or in the seconds between two
+# executions, finds nothing to save: the job resumes from an earlier save and the test fails for no
+# real reason. The job's output is streamed back (stream_output), so wait for one of the first few
+# training-step lines after a (re)start: then the next timed exit is a minute or more away.
+wait_training() {   # $1 = how many step lines after a (re)start still count as "early"
+  echo "waiting until the job is early in an execution, training (not saving or restarting)..."
+  for _ in $(seq 240); do
+    local lines; lines=$(grep -E "^(step [0-9]+|SAVED|RESUMED|STARTING|launch.py|DONE)" "$TAG.out" 2>/dev/null || true)
+    local since; since=$(echo "$lines" | awk '/^(RESUMED|STARTING)/ {n = 0; started = 1; next} /^step / {n++; next} {n = -1} END {print (started ? n : -1)}')
+    if [ "$since" -ge 1 ] && [ "$since" -le "$1" ]; then return 0; fi
+    if grep -q "^005 " "$TAG.log"; then return 0; fi    # the job ended: the check below reports it
+    sleep 5
+  done
+  echo "(never saw an early training step; interrupting anyway)"
+}
+
+job=$(submit "$TAG")
           echo "resubmitted as $job; event log: $TAG.log" ;;
   *)      echo "unknown mode $MODE"; exit 2 ;;
 esac

@@ -1,0 +1,9 @@
+# Recipe 4's Python packages, on top of PyTorch 2.8.0 (which comes with the container's base
+# image, so it isn't listed: installing it again would replace the image's CUDA build).
+# For the local tests on a laptop, also install:  torch==2.8.0
+# These are the versions the local tests ran with (Python 3.9).
+numpy==2.0.2
+pyyaml==6.0.3
+transformers==4.56.2   # loads the base model
+peft==0.17.1           # the LoRA adapters
+datasets==4.1.1        # only for prepare_data.py (downloads the dataset)

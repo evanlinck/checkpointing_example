@@ -1,0 +1,17 @@
+# Apptainer definition for recipe 4: CUDA PyTorch + the packages in requirements.txt.
+# Build it where builds are allowed (on CHTC: an interactive build job), then put it in your
+# access point's OSDF area under a new name each time you rebuild (OSDF caches by name):
+#   apptainer build recipe4-v1.sif container.def
+#   apptainer exec recipe4-v1.sif python3 -c "import torch, transformers, peft; assert torch.version.cuda"
+#   mv recipe4-v1.sif /ospool/ap40/data/<user>/recipe4/containers/     # or /staging/<user>/recipe4/containers/
+# (The check confirms a CUDA build of PyTorch; it doesn't need a GPU.)
+# The base image's CUDA (12.8) must not be newer than the GPU drivers on the machines the
+# job lands on. Check the tag exists on Docker Hub.
+Bootstrap: docker
+From: pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
+
+%files
+    requirements.txt /opt/requirements.txt
+
+%post
+    python3 -m pip install --no-cache-dir -r /opt/requirements.txt

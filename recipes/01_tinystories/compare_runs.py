@@ -124,8 +124,11 @@ def plot(refs, resumed, path):
     top.plot(vs, [resumed["val"][s] for s in vs], "o", color="#08519c", ms=4, label="val loss (resumed)")
     for ax in (top, bottom):
         for i, (s, reason) in enumerate(resumed["resumes"]):
-            ax.axvline(s, color="#cb181d" if reason == "signal" else "#fd8d3c", ls="--", lw=1,
-                       label=("restart after a %s save" % reason) if ax is top and reason not in
+            # An eviction shows as "signal", or as "stop_file" under launch.py (multi-GPU runs).
+            evicted = reason in ("signal", "stop_file")
+            kind = "an eviction (%s)" % reason if evicted else "a %s save" % reason
+            ax.axvline(s, color="#cb181d" if evicted else "#fd8d3c", ls="--", lw=1,
+                       label=("restart after %s" % kind) if ax is top and reason not in
                        [x[1] for x in resumed["resumes"][:i]] else None)
     for i, r in enumerate(refs):
         d = differences(resumed, r, "train")

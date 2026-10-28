@@ -17,6 +17,10 @@ The probes do no ML. `probe.py` pretends to train at one "step" per second and l
 | **P6a–b** `checkpoint_destination` | Does sending checkpoints to `osdf://` or `file:///staging` work, and does the restart get them back? |
 | **P7a–e** signal delivery | Who receives the signal: a wrapper with `exec`, a wrapper without `exec`, child processes, Apptainer, `torchrun`? |
 | **P8a–d** failure modes | A missing checkpoint file, exiting 85 every 5 s, no `checkpoint_exit_code`, an empty checkpoint directory. |
+| **P11d** input-size limit | OSPool access points can cap job input (`MAX_TRANSFER_INPUT_MB = 5000` on ap40, not changeable). Does a per-job `max_transfer_input_mb = 50` hold a job whose 100 MB checkpoint must come back on a new host (`-ckpt`), or whose 100 MB `osdf://` input must be fetched (`-osdf`)? `-ok` variants (limit 200) are the controls. Needs `bash setup.sh blobs`. |
+| **P12a** glidein end | Run on OSPool glideins that die within 11 h, until they die. Does the job get SIGTERM first, how long before the kill, and how does the kill compare with `GLIDEIN_ToDie` from the machine ad? Five copies (`# @queue: 5`), up to ~11 h each. |
+| **P14a–b** time caps | OSPool access points cap each execution (ap40: 20 h) and a checkpointing job's total time (14 days). Shrunk to minutes with the user-settable `allowed_execute_duration` / `allowed_job_duration`: does an exit-85 restart reset the per-execution clock (P14a)? When and how does the total cap hold a job, and can the job see its deadline in its job ad (P14b)? |
+| **P13** backups to OSDF | Is a directory listed in `transfer_checkpoint_files` and remapped to `osdf://` with `transfer_output_remaps` uploaded at every exit 85, only at the end, or not at all? (Long runs on OSPool access points need a copy that outlives the job.) **P13b**: the same, ending with exit 86 (a planned hand-off to a new job): are outputs still remapped? |
 
 > **Before anything else:** `export PROBE_STAGING_DIR=/staging/<username>` (add it to `~/.bashrc` on the access point). `make_dag.py`, `setup.sh` and `cleanup.sh` refuse to run without it, so no personal path has to be stored in the repo.
 
@@ -35,10 +39,11 @@ The probes do no ML. `probe.py` pretends to train at one "step" per second and l
 | `run_exec.sh`, `run_noexec.sh`, `run_torchrun.sh` | Wrapper variants for P7. |
 | `setup.sh`, `build.sub`, `pytorch-cpu.def` | One-time setup: `/staging` dirs and container images. |
 | `cleanup.sh` | Deletes probe data from `/staging`. |
+| `ap_survey.sh`, `ap_survey_summary.py` | A read-only survey of an access point and its pool (no jobs). See "Surveying an access point". |
 
 ## Load on the schedd
 
-Nothing here polls `condor_q`.
+Nothing here polls `condor_q`. (`ap_survey.sh` makes one-off queries; see "Surveying an access point".)
 
 - `trigger.py` decides when to fire by re-reading the job's **event log** (`job.log`, a local file) every 15 s. It sends exactly one eviction command (retried up to 3 times if the command fails), and in hold mode one release.
 - `analyze.py` makes **one** `condor_history -limit 1 -long <job>` call per job, after the job has left the queue, and caches it in `history_ad.txt`.
@@ -51,7 +56,7 @@ Nothing here polls `condor_q`.
    ```
    export PROBE_STAGING_DIR=/staging/<user>      # add to ~/.bashrc on ap2002
    ```
-3. **Create the staging dirs:** `bash setup.sh dirs`
+3. **Create the staging dirs:** `bash setup.sh dirs` (and `bash setup.sh blobs` for P11d)
 4. **Build the container image** in an interactive build job, as CHTC requests:
    ```
    condor_submit -i build.sub
@@ -68,6 +73,29 @@ Nothing here polls `condor_q`.
    ```
    (condor_version; condor_config_val MachineMaxVacateTime MaxJobRetirementTime) > ap_info.txt
    ```
+
+## Surveying an access point (no jobs)
+
+Many questions about checkpointing on the OSPool are answered by configuration, by the pool's current state, or by job history, not by experiments. `ap_survey.sh` collects them with read-only commands. It needs no `/staging` and no container, so it runs on any access point, including OSPool ones. Run it there, and on ap2002 for comparison:
+```
+nohup ./ap_survey.sh > ap_survey_run.txt 2>&1 &              # default: 30 days of history
+nohup ./ap_survey.sh --job 1234.0 > ap_survey_run.txt 2>&1 &  # also inspect one of your own running checkpointing jobs
+python3 ap_survey_summary.py results/ap-survey/<ap>
+```
+
+| File in `results/ap-survey/<ap>/` | What it answers |
+|---|---|
+| `spool.txt` | Where `SPOOL` is, its size and free space, whether users can read it; transfer limits (`MAX_TRANSFER_*`, `MAX_CONCURRENT_*`); what holds, releases or removes jobs (`SYSTEM_PERIODIC_*`, job transforms) |
+| `transfer_queue.txt` | The schedd's file-transfer queue: are uploads waiting? |
+| `held_ckpt_jobs.txt` | Self-checkpointing jobs on hold now (their checkpoints stay in spool), by days held and hold code |
+| `glideins.txt` | Glidein policy attributes, hours left before glideins retire or die, sites that preempt |
+| `gpus.txt` | The pool's GPUs: type, GPUs per slot, memory, compute capability |
+| `history.txt`, `holds.txt` | Finished jobs: starts, holds, runtime and badput, vacate and hold reasons; the most common hold messages of checkpointing jobs |
+| `job.txt` (`--job`) | One job's checkpoint and spool attributes, and whether you can list its spool directory. No self-checkpointing job on that AP? Submit [`spool_check/spool_check.sub`](spool_check/spool_check.sub) (no container, ~15 min, ≤ 10 MB of spool) and point `--job` at it |
+| `summary.md` | Tables from `history.txt` and `glideins.txt` (`ap_survey_summary.py`; its docstring explains what the numbers can and can't tell) |
+
+- **Load:** one `condor_q -allusers` with a constraint, a few collector queries, and `condor_history`, which reads local files. Thirty days of history on a busy AP can take minutes; `--history-days` shortens it.
+- **Privacy:** nothing prints `Owner` or job ids. Every file except the all-numbers `history.txt` goes through `redact.py`, and `user@` names are removed too. Check the files before sharing them.
 
 ## Running
 
@@ -102,6 +130,20 @@ condor_submit_dag runs/backfill/probes.dag
 That is four GPU jobs, about 25 GPU-minutes in total. Without `--triggers vacate --no-bare` it is nine jobs (adds vacate-fast and hold-release for P2a, hold-release for P3a, and the bare variants), about an hour. `chtc_gpu` (ordinary GPU Lab slots, for comparison) runs only P0 and P3a:
 ```
 python3 make_dag.py --sites chtc_gpu --triggers vacate --no-bare --check --tag gpu
+```
+
+**Step 5: OSPool questions for recipe 4 (CPU only).** Two DAGs, because P12a runs for hours and shouldn't hold up the rest:
+```
+bash setup.sh blobs                                   # once: the 100 MB file P11d reads through OSDF
+python3 make_dag.py --sites chtc,ospool --tests P11d,P13 --check --tag ospool-r4
+condor_submit_dag runs/ospool-r4/probes.dag           # ~1 h: 12 short jobs, 4 at a time
+python3 make_dag.py --sites ospool --tests P12a --maxjobs 5 --check --tag glidein-end
+condor_submit_dag runs/glidein-end/probes.dag         # 5 jobs, up to ~11 h each
+```
+Two follow-ups, a few minutes each:
+```
+python3 make_dag.py --sites chtc,ospool --tests P13b --check --tag handoff       # exit 86 with OSDF remaps
+python3 make_dag.py --sites chtc,ospool --tests P14 --check --tag timecaps       # the time caps, shrunk to minutes
 ```
 
 **Opt-in tests** need to be named with `--optin`:

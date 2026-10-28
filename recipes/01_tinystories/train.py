@@ -26,6 +26,7 @@ import contextlib
 import json
 import math
 import os
+import resource
 import shutil
 import sys
 from dataclasses import asdict, dataclass, fields
@@ -261,6 +262,15 @@ def main():
         use_compile = False
     compiled = torch.compile(model) if use_compile else model
 
+    # CPU threads. Some access points hold a job that uses more CPUs than it requested (an OSPool
+    # one does after an hour above 1.8 x request_cpus; see docs/environment.md §10). HTCondor sets
+    # OMP_NUM_THREADS to request_cpus, which PyTorch's main thread pool follows; os.cpu_count()
+    # is the whole machine's. cpus_used() below measures what the job really uses.
+    affinity = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None
+    print("CPU threads: torch %d, interop %d, OMP_NUM_THREADS=%s, machine has %s cores (%s usable)"
+          % (torch.get_num_threads(), torch.get_num_interop_threads(), os.environ.get("OMP_NUM_THREADS"),
+             os.cpu_count(), affinity), flush=True)
+
     def save(reason):
         """Save a resumable checkpoint. Returns the CheckpointStore save info."""
         state = {
@@ -277,14 +287,30 @@ def main():
                                         torch=torch.__version__))
         print("SAVED step %d (reason: %s) in %.2f s, %.0f MB, %d files"
               % (step, reason, info["seconds"], info["bytes"] / 1e6, info["files"]), flush=True)
+        # CPUs used: over the whole process (start-up and compiling included), and since the first
+        # step (steady training, which is what a CPU-usage policy sees over hours).
+        cpus = {"cpus_used": cpus_used((0.0, T_PROCESS_START)),
+                "cpus_used_training": cpus_used(training_start) if training_start else None}
+        print("CPUs used: %.2f on average since the process started, %s while training"
+              % (cpus["cpus_used"], cpus["cpus_used_training"]), flush=True)
         log(event="checkpoint", step=step, reason=reason, seconds=info["seconds"], bytes=info["bytes"],
-            files=info["files"], peak_gpu_gb=peak_gpu_gb())
+            files=info["files"], peak_gpu_gb=peak_gpu_gb(), **cpus)
         # Backups only at timed checkpoints: never in the SIGTERM path, where time is short.
         if backups and reason == "timed" and backup_due(backups, cfg.backup_every_hours * 3600):
             b = backup(info["path"], backups)
             print("BACKUP of step %d to %s in %.2f s" % (step, b["path"], b["seconds"]), flush=True)
             log(event="backup", step=step, seconds=b["seconds"], path=b["path"])
         return info
+
+    def cpu_seconds():
+        """CPU time of this process and its finished children (torch.compile's workers)."""
+        me, kids = resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN)
+        return me.ru_utime + me.ru_stime + kids.ru_utime + kids.ru_stime
+
+    def cpus_used(since):
+        """Average number of CPUs busy since `since` = (cpu seconds, wall time)."""
+        cpu0, t0 = since
+        return round((cpu_seconds() - cpu0) / max(time.time() - t0, 1e-9), 2)
 
     def peak_gpu_gb():
         """Most GPU memory this process has used so far: what a GPU needs to run this config."""
@@ -341,6 +367,7 @@ def main():
     # ------------------------------------------------------------------ training
     compiled.train()
     first_step_logged = False
+    training_start = None   # (cpu seconds, time) at the first step, for cpus_used()
     last_save = time.time()
     t_log, tokens_at_log = time.time(), tokens_seen
     while epoch < cfg.epochs and not (cfg.max_steps and step >= cfg.max_steps):
@@ -369,6 +396,7 @@ def main():
                        if device == "cuda" else "on CPU")
                 print("first step done %.1f s after the process started, %s" % (startup, gpu), flush=True)
                 log(event="first_step", step=step, startup_seconds=round(startup, 1), gpu=gpu)
+                training_start = (cpu_seconds(), time.time())
             if step % cfg.log_every == 0:
                 dt = time.time() - t_log
                 tps = (tokens_seen - tokens_at_log) / max(dt, 1e-9)

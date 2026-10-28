@@ -1,0 +1,91 @@
+# Recipe 2 on CHTC GPUs: GPT-2 small with DDP on one multi-GPU node, checkpoints on /staging.
+# Submit with:  condor_submit job.sub          (first replace the <...> placeholders)
+#   on 1 GPU:   condor_submit job.sub -a "NGPUS = 1"
+# Before submitting, copy the shared checkpointing modules next to this file:
+#   cp -r ../../htcondor_ckpt .
+
+# How many GPUs (all on one machine). The lines below follow it: torchrun's worker count,
+# CPUs and host memory. 4 is the most a CHTC job can get on one node.
+NGPUS                     = 4
+# Where the shards are (made by prepare_data.py; see prepare.sub).
+DATA_DIR                  = /staging/<user>/recipe2/fineweb10B
+# One name per run: its checkpoints and outputs live in RUN_DIR on /staging.
+# Keep the name when you resubmit a run, so it resumes; change it to start a new one.
+RUN                       = run1
+RUN_DIR                   = /staging/<user>/recipe2/$(RUN)
+# Extra train.py settings, e.g. for a short smoke run:
+#   condor_submit job.sub -a "RUN = smoke" -a "EXTRA = --set max_steps=200"
+EXTRA                     =
+
+# --- What to run ---
+# The chain of processes:  launch.py -> torchrun -> NGPUS training processes (one per GPU).
+# - `exec`: launch.py becomes the job's top process, the one HTCondor sends SIGTERM to.
+# - launch.py (from htcondor_ckpt): on SIGTERM it creates a stop file instead of passing the
+#   signal on. Plain torchrun would kill the workers 30 s after SIGTERM, cutting off a longer
+#   save, and turns their exit 85 into 1 (measured: docs/environment.md section 6).
+#   The workers see the stop file, agree on a step, save, and exit; launch.py exits 85.
+# - `export HOME=$PWD`: the container is read-only, and torch.compile/Triton write caches
+#   under $HOME, so point it at the job's own (writable) directory first.
+# - --resume auto: the same command for the first start and every restart.
+# - The data, checkpoints and outputs are all on /staging: nothing big is transferred.
+shell                     = export HOME=$PWD; exec python3 htcondor_ckpt/launch.py -- torchrun --standalone --nproc_per_node=$(NGPUS) train.py --config config.yaml --resume auto --set data_dir=$(DATA_DIR) --set ckpt_dir=$(RUN_DIR)/checkpoints --set out_dir=$(RUN_DIR)/outputs $(EXTRA)
+# The code and the shared checkpointing modules (the htcondor_ckpt directory, copied here).
+transfer_input_files      = train.py, model.py, config.yaml, htcondor_ckpt
+# /staging must be mounted where the job runs.
+requirements              = (HasCHTCStaging =?= true)
+# NCCL (how the GPUs exchange gradients) copies directly between GPUs only over NVLink; on machines
+# without NVLink (e.g. PCIe-only RTX PRO 6000 servers) it goes through host memory instead.
+# Why: on one RTX PRO 6000 machine the 2-GPU smoke run hung at its first all-reduce until NCCL's
+# timeout, probably because direct GPU-to-GPU copies over PCIe aren't supported there (to be
+# confirmed). On NVLink machines (e.g. A100-SXM) this changes nothing.
+environment               = "NCCL_P2P_LEVEL=NVL"
+
+# --- Checkpointing ---
+# Exit 85 means "progress saved, restart me". There are no transfer lines: checkpoints are
+# written straight to /staging, so each save is safe the moment it's written, and in-place
+# saves every 30 min (config.yaml) protect against hard kills between timed exits.
+checkpoint_exit_code      = 85
+# The signal launch.py listens for.
+kill_sig                  = SIGTERM
+
+# --- Software ---
+# Recipe 1's image: PyTorch 2.8 with CUDA, gcc (for torch.compile), tiktoken, numpy, pyyaml.
+container_image           = osdf:///chtc/staging/<user>/<path>/recipe1.sif
+
+# --- GPUs ---
+request_gpus              = $(NGPUS)
+# GPU memory per GPU, not to be confused with request_memory (host RAM). Write the unit: 30000M
+# (megabytes), not a bare 30000. Measured peak at micro_batch 32: 22.8 GB per GPU (A100, smoke run),
+# so 30 GB leaves headroom (PyTorch reserves more than it allocates). That admits 40 GB A100s,
+# L40/L40S, H100/H200, RTX Pro 6000... For smaller GPUs, lower micro_batch in config.yaml:
+# gradient accumulation keeps the step at 0.5M tokens.
+gpus_minimum_memory       = 30000M
+# bf16 needs compute capability 8.0 (Ampere) or newer: this keeps out e.g. 32 GB V100s (7.0).
+gpus_minimum_capability   = 8.0
++WantGPULab               = true
+# CHTC GPU job lengths: short = 12 h, medium = 24 h, mediumlong = 72 h, long = 168 h.
+# Every execution ends within the 1 h timed exit (config.yaml), so "short" is plenty.
++GPUJobLength             = "short"
+# Lets the job use backfill slots, and (per CHTC policy) turns reaching the job-length limit
+# into an eviction (save + restart) instead of a hold.
++is_resumable             = true
+# To run ONLY on backfill slots (reclaimed when their owners need them), uncomment. A machine
+# with 4 free backfill GPUs is rare: use fewer GPUs there (-a "NGPUS = 2").
+# requirements            = (HasCHTCStaging =?= true) && (TARGET.BackfillSlot =?= true)
+
+# --- Resources ---
+# Per GPU: 4 CPUs and 16 GB of host memory (each worker holds the model, and a copy of the
+# checkpoint while resuming). Starting points: the smoke run shows what's actually used.
+request_cpus              = 4 * $(NGPUS)
+request_memory            = 16384 * $(NGPUS)
+# The container and the code; everything big lives on /staging.
+request_disk              = 20GB
+
+# --- Logs ---
+# HTCondor's record of what happened to the job (started, evicted, restarted):
+log                       = job_$(RUN).log
+# What the training processes print (all ranks), appended across restarts:
+output                    = job_$(RUN).out
+error                     = job_$(RUN).err
+
+queue

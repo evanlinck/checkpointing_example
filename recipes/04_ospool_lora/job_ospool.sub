@@ -1,0 +1,73 @@
+# Recipe 4: LoRA fine-tuning on the OSPool.
+#
+# Submit it on its own (one job, up to your access point's limit on a job's total time):
+#     mkdir -p resume && condor_submit job_ospool.sub
+# or through the DAG, which continues in a new job when that limit comes (see README):
+#     condor_submit_dag recipe4.dag
+#
+# Before submitting, copy the shared checkpointing modules next to this file:
+#     cp -r ../../htcondor_ckpt .
+
+# ===== Your settings =====
+# Where your base model and container are: edit settings.sub (once), not this file.
+include : settings.sub
+
+# ===== What to run =====
+# `exec` makes Python the job's top process: the one HTCondor sends its SIGTERM to.
+# `export HOME=$PWD`: the container is read-only; libraries that write caches under $HOME
+# then use the job's own directory.
+# `mkdir -p checkpoints outputs`: the directories HTCondor copies back must exist even if
+# train.py fails at start-up. Otherwise the job is held for a missing directory, and the
+# hold message hides the real error (seen in our first test run).
+shell                     = export HOME=$PWD; mkdir -p checkpoints outputs; exec python3 train.py --config config.yaml --set model_dir=$(MODEL)
+# Small files come from here: the code, the shared checkpointing modules, the data from
+# prepare_data.py (a few MB) and resume/ (the previous job's checkpoint, when the DAG starts
+# a new job; empty otherwise). The base model (3 GB) comes through OSDF: OSPool's advice for
+# files over 1 GB, and OSDF inputs don't count against the access point's input limit.
+transfer_input_files      = train.py, config.yaml, htcondor_ckpt, data, resume, $(DATA_URL)/models/$(MODEL)?recursive
+container_image           = $(DATA_URL)/containers/$(IMAGE)
+
+# ===== Checkpointing =====
+# Exit 85 means "progress saved, restart me". Without this line, it would mean "done".
+checkpoint_exit_code      = 85
+# What HTCondor keeps on the access point between restarts: one directory, created by
+# train.py at start-up (a missing one would put the job on hold).
+transfer_checkpoint_files = checkpoints
+# Keep it when the job is evicted too. Without this, the save made after SIGTERM is lost.
+when_to_transfer_output   = ON_EXIT_OR_EVICT
+# Directories only come back if named here: the checkpoints, and outputs/ (the adapters).
+transfer_output_files     = checkpoints, outputs
+# The signal train.py listens for.
+kill_sig                  = SIGTERM
+
+# ===== Where it runs =====
+# These two lines send the job from a CHTC access point to the OSPool. On an OSPool access
+# point they aren't needed (and do no harm).
+want_ospool               = true
+requirements              = (Poolname =!= "CHTC")
+# OSPool access points limit each execution: Medium = 20 h, Long = 40 h. Every exit 85 starts
+# a new execution, and train.py checkpoints every 5 h, so Medium is plenty.
++JobDurationCategory      = "Medium"
+
+# ===== Resources =====
+request_gpus              = 1
+# GPU memory in MB (not request_memory). Measured peak: 19.0 GB on every GPU type; 24 GB leaves room.
+gpus_minimum_memory       = 24000
+# bf16 needs an A100-generation GPU or newer.
+gpus_minimum_capability   = 8.0
+# Training uses about one CPU. HTCondor sets OMP_NUM_THREADS to this number, and some access
+# points hold jobs that use far more CPUs than they request.
+request_cpus              = 2
+# Host memory. Measured peak: 6.3 GB.
+request_memory            = 10GB
+# The base model (3 GB), the container, checkpoints, and room for one save in progress.
+request_disk              = 30GB
+
+# ===== Logs =====
+# HTCondor's record of what happened to the job (started, evicted, file transfers):
+log                       = job.log
+# What train.py prints. HTCondor adds to these files across restarts:
+output                    = job.out
+error                     = job.err
+
+queue

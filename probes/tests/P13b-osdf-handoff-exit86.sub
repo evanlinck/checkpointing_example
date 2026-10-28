@@ -1,0 +1,12 @@
+# P13b - Are outputs remapped to OSDF when a job ends with a non-zero exit code?
+# @question: Same as P13, but the job ends with exit 86 instead of 0 (a planned hand-off: "continue in a new job", since exit 0 should mean training is finished). Does the remapped directory still reach OSDF, and does the job leave the queue normally (return value 86, not a hold or a requeue)?
+# @sites: chtc ospool
+# The probe writes backup/state_<step>.json at each save (a new name each time: OSDF caches by
+# name). Voluntary exits at steps 30 and 60, final exit 86 at 90. analyze.py lists what arrived in
+# $(STAGING_DIR)/ckpt-probes/p13/<job>/ (the AP reads /staging directly) and when.
+checkpoint_exit_code      = 85
+transfer_checkpoint_files = ckpt, backup
+transfer_output_files     = ckpt, out, backup
+transfer_output_remaps    = "backup = $(OSDF_STAGING)/p13/$(Cluster).$(Process)/backup"
+stream_output = true
+arguments = $(PROBE_ARGS) --voluntary-exit-at 30,60 --backup-dir backup --total-steps 90 --final-exit-code 86

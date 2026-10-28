@@ -183,6 +183,14 @@ def analyze_test(job_dir, job_id=None):
                   "scratch": r.get("scratch_dir"), "marker": r.get("sandbox_marker_survived"),
                   "prev_starts": r.get("previous_starts_in_sandbox"),
                   "NumJobStarts": (r.get("job_ad") or {}).get("NumJobStarts")}
+            mad = r.get("machine_ad") or {}
+            if mad.get("GLIDEIN_ToDie"):
+                try:
+                    ex["todie"] = float(mad["GLIDEIN_ToDie"])
+                    ex["toretire"] = float(mad.get("GLIDEIN_ToRetire") or "nan")
+                except ValueError:
+                    pass
+                ex["site"] = mad.get("GLIDEIN_Site")
             mine = [x for x in recs if x.get("exec") == r["exec"]]
             rest = [x for x in mine if x.get("event") == "restore"]
             if rest:
@@ -216,6 +224,45 @@ def analyze_test(job_dir, job_id=None):
         obs.append("Final job state: %s %s" % (last["name"], ("(" + detail + ")") if detail else ""))
     elif not events:
         obs.append("No HTCondor events found for this job (not submitted, or job.log missing).")
+
+    # P13: which backup files reached OSDF (= /staging, read directly here), and when.
+    if meta.get("base_test", "").startswith("P13") and job:
+        staging = submit_macro(job_dir, "STAGING_DIR")
+        bdir = os.path.join(staging or "", "ckpt-probes", "p13", job, "backup")
+        if staging and os.path.isdir(bdir):
+            got = sorted((n, os.path.getmtime(os.path.join(bdir, n))) for n in os.listdir(bdir))
+            exits = [(ex.get("exit_code"), ex.get("exit_t")) for ex in execs if ex.get("exit_t")]
+            obs.append("Backup files on OSDF (/staging): %s; probe exits: %s."
+                       % (", ".join("%s at %s" % (n, fmt_t(t)) for n, t in got) or "none",
+                          ", ".join("%s at %s" % (c, fmt_t(t)) for c, t in exits)))
+        else:
+            obs.append("No backup directory on OSDF (/staging): %s does not exist." % bdir)
+
+    # P14: the time caps. When was the job held, relative to its first start, and what deadline
+    # could the job itself have computed from its job ad?
+    if meta.get("base_test", "").startswith("P14") and execs:
+        first = execs[0]
+        ad = next((r.get("job_ad") or {} for r in recs if r.get("event") == "start"), {})
+        held = [e for e in events if e["name"] == "held"]
+        line = "First start %s" % fmt_t(first["t"])
+        if held and held[0].get("t"):
+            line += "; held %.0f s later" % (held[0]["t"] - first["t"])
+        else:
+            line += "; never held"
+        limits = {k: ad[k] for k in ("AllowedExecuteDuration", "AllowedJobDuration", "JobStartDate") if k in ad}
+        line += "; job ad at first start: %s" % (limits or "no limit attributes")
+        if "AllowedJobDuration" in ad and "JobStartDate" in ad:
+            try:
+                line += " -> deadline the job could compute: %s" % fmt_t(float(ad["JobStartDate"]) + float(ad["AllowedJobDuration"]))
+            except ValueError:
+                pass
+        obs.append(line + ".")
+
+    # Every hold, with HTCondor's reason (P11d: "MaxTransferInputSizeExceeded" or similar).
+    for e in events:
+        if e["name"] == "held":
+            obs.append("Held at %s: %s" % (fmt_t(e["t"]) if e.get("t") else "?",
+                                           "; ".join(b for b in e["body"] if b)[:300]))
 
     n_exec_events = len([e for e in events if e["name"] == "executing"])
     obs.append("Executions seen by the probe: %d; 'executing' events in job.log: %d (an exit-85 restart "
@@ -269,7 +316,27 @@ def analyze_test(job_dir, job_id=None):
                 obs.append("No later execution was observed.")
         else:
             obs.append("The trigger fired while no probe execution was running.")
-    elif meta.get("trigger"):
+    elif not meta.get("trigger"):
+        # No trigger: an execution that never exited was ended by something real (P12a: the
+        # glidein's end). Report the signal, the grace it got, and its death vs. GLIDEIN_ToDie.
+        for ex in execs:
+            if "exit_code" in ex or ex is execs[-1] and not terminal:
+                continue
+            where = (" on a glidein at %s" % ex["site"]) if ex.get("site") else ""
+            if ex.get("signal"):
+                line = ("Execution%s was interrupted: %s, then it ran %.0f s more until killed"
+                        % (where, ex["signal"], ex["last_seen"] - ex["signal_t"]))
+            else:
+                line = ("Execution%s was interrupted with NO signal (hard kill); last sign of life at %s"
+                        % (where, fmt_t(ex["last_seen"])))
+            if ex.get("todie"):
+                line += ("; GLIDEIN_ToDie was %+.0f s from its last sign of life (negative: died after ToDie)"
+                         % (ex["todie"] - ex["last_seen"]))
+                if ex.get("signal"):
+                    line += ", signal %+.0f s before ToDie" % (ex["todie"] - ex["signal_t"])
+                line += "; it started %.1f h before ToDie" % ((ex["todie"] - ex["t"]) / 3600)
+            obs.append(line + ".")
+    if meta.get("trigger") and not t_fire:
         reason = [r for r in trig if r.get("action") == "gave_up"]
         obs.append("Trigger did not fire%s." % (": " + reason[-1].get("reason", "") if reason else " (no trigger.jsonl)"))
 
@@ -323,7 +390,7 @@ def analyze_test(job_dir, job_id=None):
         obs.append("Inherited signal masks: %s" % fp.get("signal_masks"))
 
     selected_ad = {k: v for k, v in hist_ad.items()
-                   if re.search(r"^Num|Committed|WallClock|^Exit|Hold|Checkpoint|Ckpt|Vacate|Evict|LastRemoteHost|KillSig|TransferOut|TransferIn.*Time", k)}
+                   if re.search(r"^Num|Committed|WallClock|^Exit|Hold|Checkpoint|Ckpt|Vacate|Evict|LastRemoteHost|KillSig|TransferOut|TransferIn.*Time|MaxTransfer", k)}
 
     # ---- write -----------------------------------------------------------
     tag = meta.get("tag") or os.path.basename(os.path.dirname(os.path.dirname(job_dir)))

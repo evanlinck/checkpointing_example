@@ -1,0 +1,9 @@
+# P11d - Do osdf:// inputs count against the input-size limit?
+# @question: Control for P11d-input-limit-osdf: the same 100 MB osdf:// input with max_transfer_input_mb = 200. It should run normally.
+# @sites: chtc
+# @variants: bare
+# Only the bare variant answers the question cleanly (no container image to count); the
+# container variant is kept as a second data point. Needs: bash setup.sh blobs (once).
+max_transfer_input_mb = 200
+transfer_input_files  = $(OSDF_STAGING)/blobs/blob-100mb-v1.bin
+arguments = $(PROBE_ARGS) --total-steps 20
