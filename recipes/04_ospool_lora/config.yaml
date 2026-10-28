@@ -1,0 +1,42 @@
+# Recipe 4 settings. Any of these can be changed from the command line:
+#   python3 train.py --config config.yaml --set epochs=3 --set lr=0.0001
+
+# --- where things are, inside the job ---
+model_dir: model          # the base model's files (from prepare_data.py, sent to the job through OSDF)
+data_dir: data            # train.npy and val.npy (from prepare_data.py)
+ckpt_dir: checkpoints     # resumable checkpoints, and metrics.jsonl (the training log)
+resume_dir: resume        # the previous job's checkpoints, when a DAG starts a new job (see README)
+out_dir: outputs          # what you keep: the trained adapters
+
+# --- LoRA: small trainable matrices added to the frozen base model ---
+lora_r: 16                # size of each adapter; bigger = more to train, bigger checkpoints
+lora_alpha: 32            # scales the adapters' effect (usually 2 x lora_r)
+lora_dropout: 0.05
+lora_targets: q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj   # which layers get adapters
+
+# --- training ---
+seq_len: 1024             # tokens per training example; must match prepare_data.py --seq-len
+epochs: 2
+batch_size: 8             # examples per step
+lr: 0.0002
+min_lr: 0.00002
+warmup_steps: 50
+weight_decay: 0.0
+grad_clip: 1.0
+seed: 1234
+gradient_checkpointing: true   # less GPU memory, ~30% slower steps
+deterministic: false      # true makes resumed runs match exactly, a little slower (the local tests use true)
+
+# --- evaluation and logging ---
+eval_every_steps: 200
+eval_batches: 20          # validation loss is measured on the same 20 x 8 examples every time
+log_every: 10
+
+# --- checkpointing ---
+keep_checkpoints: 1       # spool keeps one copy of everything in ckpt_dir: keep it small
+max_runtime_seconds: 18000    # the timed checkpoint: save and exit 85 after 5 h (OSPool: 4-6 h)
+limit_margin_seconds: 900     # stop this long before a hard limit (glidein end, access point limits)
+
+# --- for tests ---
+step_delay: 0.0           # seconds to sleep per step, to make a test job slow
+max_steps: 0              # stop as if finished after this many steps (0 = all epochs)

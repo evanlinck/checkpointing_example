@@ -1,0 +1,31 @@
+# Recipe 4, once before training: download the base model and the dataset (prepare_data.py).
+#     condor_submit prepare.sub
+# When it finishes:
+#   - the base model is in your OSDF area, at $(DATA_URL)/models/$(MODEL)
+#   - data/ (train.npy, val.npy, meta.json; a few MB) is here, next to job_ospool.sub
+
+# Your settings (where the model goes, which container): edit settings.sub, not this file.
+include : settings.sub
+
+shell                     = export HOME=$PWD; exec python3 prepare_data.py --out-model $(MODEL) --out-data data
+transfer_input_files      = prepare_data.py
+container_image           = $(DATA_URL)/containers/$(IMAGE)
+
+# The model (3 GB) goes straight to OSDF, as OSPool advises for files over 1 GB.
+# data/ comes back here.
+transfer_output_files     = $(MODEL), data
+transfer_output_remaps    = "$(MODEL) = $(DATA_URL)/models/$(MODEL)"
+
+# Execute points have internet access, so the job downloads from Hugging Face itself.
+# From a CHTC access point, these two lines send it to the OSPool (not needed on an OSPool one).
+want_ospool               = true
+requirements              = (Poolname =!= "CHTC")
+
+request_cpus              = 2
+request_memory            = 8GB
+request_disk              = 20GB
+
+log                       = prepare.log
+output                    = prepare.out
+error                     = prepare.err
+queue

@@ -1,0 +1,16 @@
+# settings.sub - YOUR settings for recipe 4. Edit these three lines once.
+# job_ospool.sub and prepare.sub both read this file (`include : settings.sub`), so updating
+# those files never erases your settings.
+
+# Your access point's OSDF area, as a URL: where the base model and the container live.
+#   On an OSPool access point (ap40 shown):  osdf:///ospool/ap40/data/<user>/recipe4
+#   On a CHTC access point (ap2002):         osdf:///chtc/staging/<user>/recipe4
+#     (that is your /staging/<user>/recipe4 directory; OSDF serves /staging under this name)
+DATA_URL  = osdf:///ospool/ap40/data/<user>/recipe4
+
+# The base model's directory there (prepare.sub puts it there). A new version gets a new
+# name: OSDF caches files by name.
+MODEL     = qwen2.5-1.5b-v1
+
+# The container image there (built from container.def).
+IMAGE     = recipe4-v1.sif

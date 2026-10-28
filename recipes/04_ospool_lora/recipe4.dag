@@ -1,0 +1,17 @@
+# recipe4.dag - keep training past the access point's limit on a job's total time.
+#
+#     condor_submit_dag recipe4.dag
+#
+# One training job (job_ospool.sub) at a time. When it ends:
+#   exit 0  (finished)               -> the DAG is done
+#   exit 86 (continue in a new job)  -> handoff.sh moves its checkpoints to resume/, and RETRY
+#                                       submits the same job again: a new job, with a fresh
+#                                       time limit, that continues from resume/
+#   anything else (an error)         -> the DAG stops, so you can look at job.err
+#
+# RETRY 50: at most 50 new jobs (on ap40, 50 x 14 days). Raise it if you need more.
+
+JOB train job_ospool.sub
+SCRIPT PRE  train handoff.sh pre
+SCRIPT POST train handoff.sh post $RETURN
+RETRY train 50 UNLESS-EXIT 2

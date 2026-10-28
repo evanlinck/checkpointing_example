@@ -6,14 +6,15 @@ This repository contains baseline training recipes for users of CHTC (the Center
 
 The checkpointing logic is **framework-neutral**. The core decides *when* to save and *where* (stop signals, deadlines, atomic directories, exit codes). The framework code decides *what* to save and *how* (state dicts, sharded saves). PyTorch is the worked example throughout. The guide shows how the same core plugs into other frameworks.
 
-There are four recipes, each building on the last:
+There are five recipes. The first four build on each other; recipe 4 stands apart:
 
 0. `recipes/00_minimal/`: one short plain-PyTorch script with no dependency on our package. It shows the five blocks every job needs (signal flag, atomic save, resume, exit 85, finish). Spec: `docs/00-minimal.md`.
 1. `recipes/01_tinystories/`: small GPT trained from scratch on one GPU. Teaches the full single-GPU contract, checkpointing at epoch boundaries *and* during an epoch, and every storage mode. Spec: `docs/01-tinystories-gpt.md`.
 2. `recipes/02_gpt2_fineweb/`: GPT-2 124M trained from scratch with DDP on one multi-GPU node. Teaches distributed stop agreement, launchers, and long multi-execution runs. Spec: `docs/02-gpt2-fineweb-ddp.md`.
 3. `recipes/03_fsdp_finetune/`: full fine-tune of a ~7–8B model with FSDP2 and PyTorch Distributed Checkpoint (DCP). Teaches sharded, async and resharding checkpoints under a time and storage budget. Spec: `docs/03-fsdp-dcp-finetune.md`.
+4. `recipes/04_ospool_lora/`: LoRA fine-tune of a ~1.5B model on one OSPool GPU, laid out like a typical OSPool job. Teaches checkpointing where interruptions come without warning (glidein ends), the access point's time and input limits, and continuing past a job's total-time limit with a DAG (exit 86 hand-off). Written for readers with little programming experience. Spec: `docs/04-ospool-lora.md`.
 
-Build them in order. Do not start a later recipe until the earlier one passes its acceptance criteria.
+Build them in order, except that recipe 4 was built before recipe 3 at the user's request (2026-10-27). Do not start a later recipe until the earlier one passes its acceptance criteria.
 
 ## What we already know: `docs/environment.md`
 
@@ -47,7 +48,7 @@ The facts that shape everything below:
 CLAUDE.md
 docs/
   environment.md              # measured HTCondor behavior (source of truth)
-  00-minimal.md  01-tinystories-gpt.md  02-gpt2-fineweb-ddp.md  03-fsdp-dcp-finetune.md
+  00-minimal.md  01-tinystories-gpt.md  02-gpt2-fineweb-ddp.md  03-fsdp-dcp-finetune.md  04-ospool-lora.md
   checkpointing-guide.md      # user-facing guide, written last
 probes/                       # maintainer tooling: HTCondor behavior tests (done; rerun when the pool changes). Never used by recipes.
 results/                      # probe result summaries cited by docs/environment.md
@@ -60,7 +61,7 @@ htcondor_ckpt/                # shared checkpointing modules: written package-re
 examples/                     # copyable starter files (see below)
 tests/                        # unit tests for htcondor_ckpt/
 recipes/
-  00_minimal/  01_tinystories/  02_gpt2_fineweb/  03_fsdp_finetune/
+  00_minimal/  01_tinystories/  02_gpt2_fineweb/  03_fsdp_finetune/  04_ospool_lora/
 ```
 
 **Shared code: examples now, a package later.** For now there is no `pyproject.toml` and no install step. We first want to learn how these pieces behave in real recipes. But write `htcondor_ckpt/` so that turning it into an installable package later means adding packaging files, not rewriting code:
@@ -209,7 +210,7 @@ Each recipe must pass:
 1. ~~Measure HTCondor behavior (probes) and fill in `docs/environment.md`.~~ Done.
 2. Recipe 0 (dependency-free reference), including its local and HTCondor tests on CHTC and OSPool.
 3. The `htcondor_ckpt/` core modules, factored out of recipe 0, plus their unit tests and `examples/`. Don't package them yet.
-4. Recipe 1, then the PyTorch adapter's distributed parts and the launcher wrapper, then recipe 2, then recipe 3.
+4. Recipe 1, then the PyTorch adapter's distributed parts and the launcher wrapper, then recipe 2, then recipe 4 (OSPool), then recipe 3.
 5. Write `docs/checkpointing-guide.md` last, using measurements and plots from the real runs. Topics it must cover:
    - **When a SIGTERM save happens and what it contains:** step boundaries, and why not to save inside the handler.
    - **Which storage setups make that save durable.**
