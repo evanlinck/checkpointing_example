@@ -10,9 +10,21 @@ Read `CLAUDE.md` first. This recipe reuses the shared modules in `htcondor_ckpt/
 | **Model:** OLMo 3 7B base (`allenai/Olmo-3-1025-7B`, ~7.3B parameters, Apache-2.0, not gated); name in config | A different model family in each recipe (GPT, GPT-2, Qwen, OLMo). Fully open weights, data and code. Fallback: `allenai/OLMo-2-1124-7B`. Confirm the license and parameter count when writing `prepare_data.py` |
 | **Data:** a configurable random subset of the Tülu 3 SFT mixture (`allenai/tulu-3-sft-mixture`, ODC-BY), sized so one epoch takes a few hours on 4 GPUs | It's the data AI2 used for OLMo's own instruct models. Dolly-15k (recipe 4) would make an epoch take minutes. Alternative: SmolTalk (Apache-2.0) |
 | **Container:** the shared image `containers/recipes.def` (PyTorch 2.8 + CUDA 12.8, transformers 4.57.6, which is the first with OLMo 3) | One image for recipes 1–4. Recipe 0 keeps its own CPU image. transformers 5.x would mean also updating recipe 4's code |
-| **GPUs:** 4 × 80 GB (A100-80GB, H100, H200) by default, L40S (48 GB) only if measured to fit; resharding test on 2 × 80 GB | Estimated ~40–45 GB per GPU on 4 GPUs (16 bytes per parameter for weights, gradients and AdamW, plus activations), ~70 GB on 2. H200s aren't needed. `probes/gpu_machines.sh` shows which machines qualify |
+| **GPUs:** 4 GPUs chosen by memory, `gpus_minimum_memory = 79000M` (A100-80GB, H100, H200; RTX PRO 6000 too, see the Blackwell row), not by model name. A documented "start sooner" option with 2 GPUs (same floor). L40S (48 GB) opt-in only if measured to fit | Estimated ~40–45 GB per GPU on 4 GPUs (16 bytes per parameter for weights, gradients and AdamW, plus activations), ~70 GB on 2. Pool history (`docs/environment.md` §11): ~9–11 machines qualify; waiting for 4 free GPUs takes a median ~14 h (41 % over a day), for 2 about 1 h; naming one model makes it 2–3× longer; a 4-GPU backfill job is evicted after a median ~14 h. The README sets these expectations |
+| **Backfill built in (decided 2026-10-28):** the default `job.sub` matches GPU Lab *and* backfill slots (`+is_resumable = true`, no requirement either way), and the job adapts at every start (see Checkpointing specifics). The README also gives the one-line requirements for "backfill only" and "GPU Lab only" | Backfill is often free, and we want long jobs to use it. The pool had 4 free ≥ 75 GB backfill GPUs about as often as GPU Lab ones (16 % vs 18 % of snapshots) and the two only partly overlap, so allowing both shortens the wait. The price is evictions (median ~14 h on backfill), which the frequent in-place saves on `/staging` make cheap: a backfill eviction costs at most one save interval plus the wait for new GPUs |
+| **Blackwell (RTX PRO 6000):** decided after `probes/gpu_comm/` | They pass the memory floor and the CUDA 12.8 image runs on them, but they're PCIe-only and need `NCCL_P2P_LEVEL=NVL`, which routes FSDP's ~60 GB per GPU per step through host memory. If that's much slower, add `gpus_maximum_capability = 9.0` |
+| **Host memory: as small as the measurements allow.** Async saves are optional (a config switch), and the README gives both costs: sync saves need roughly 50–60 GB of host memory but pause training for the whole save (minutes per save); async saves pause it for seconds but hold a CPU copy of every rank's share of the state (~22 GB per rank, ~90 GB in all), so the request roughly doubles. Pick the default after measuring both; load the base model so no rank holds a full copy | Large memory requests take longer to match, in the maintainer's experience, even though the pool history shows plenty of free memory on the machines whenever 4 GPUs were free (§11, which can't see matching). |
+| **Checkpoints: in-place saves and the timed exit both follow the slot type the job landed on** (agreed 2026-10-28). GPU Lab (open capacity): in-place saves every 60 min, one timed exit just before the `+GPUJobLength` window ends. Backfill: in-place saves every 30 min, a timed exit every 6–10 h (CHTC's guidance for backfill) | CHTC's 4–6 h (OSPool) and 6–10 h (backfill) intervals are for capacity that can disappear; GPU Lab capacity lasts for the job-length window, so the job can run to it. Fewer exits also matter here: each exit 85 risks losing the 4-GPU claim, and getting 4 GPUs back can take a day (§11; recipe 2 saw 1 reschedule in 5 timed exits, §5). On `/staging` the hourly in-place saves protect against hard kills. See "Checkpointing specifics" |
 | **Measure the pool first:** P15 (parallel `/staging` writes and reads), `probes/gpu_comm/` (GPU-to-GPU speed), `probes/gpu_machines.sh` (machines, host memory, how often 4 GPUs are free) | The recipe's defaults (files per rank, save interval, whether a final save is normally attempted, `request_memory`, which GPUs) should rest on numbers |
 | **`/staging` quota:** the README keeps the footprint worksheet and the quota request | The maintainer has 1 TB, but a normal user has the default 100 GB, which one checkpoint (~88 GB) fills |
+
+## Measured so far (2026-10-28)
+
+- **`/staging` speed** (P15, `docs/environment.md` §7): a 90 GB save from 4–8 writers took **153–169 s** normally and **230–330 s** in a slow period; loading it with 8 readers took 105–114 s (233–328 s slow). So a final save after SIGTERM normally fits the 600 s window (and the ~420 s target), but a slow period gets close: keep the decision based on the *measured* save time. Write ~1–2 files per rank and **load with ≥ 2 threads per rank** (one stream reads only 100–140 MB/s). An hourly *synchronous* save would pause training 2.5–5.5 min per hour (4–9 %), which argues for async saves despite their memory cost (measure). Deleting an old checkpoint takes seconds.
+- **The quota can't be read from inside the job** (free space shows the whole filesystem), so the space check needs a `staging_quota_gb` setting, or a clear message when a write fails.
+- **memlock is 8 MB:** confirm `dcp.async_save`'s pinned-memory staging works, or falls back.
+- **GPU-to-GPU speed** (`probes/gpu_comm/`): on an NVLink H100 machine, FSDP's communication is ~0.13 s per step: negligible. PCIe machines (L40S, RTX PRO 6000) not measured yet.
+- **chirp works in the container** on CHTC and the OSPool: the recipe can report `LastCheckpointStep` / `LastCheckpointReason` to `condor_q` once per checkpoint (optional `htcondor_ckpt/chirp.py`).
 
 ## Goal
 
@@ -48,7 +60,7 @@ Write a short calculation in the README: 8B parameters × (bf16 weights + fp32 m
 
   It shows the numbers for the default config, and tells users to **request a larger `/staging` quota from CHTC** with those numbers. This is a normal request. Don't design around the default.
 - **Few, large files.** `/staging` writes many small files 10–40× slower than a few large ones (measured, docs/environment.md §7). Configure DCP's writer for a small number of files per rank (e.g. one or a few per rank, not one per tensor). Measure files per checkpoint and record it.
-- Retention: default 2 resumable checkpoints, configurable down to 1. The README explains the risk trade-off of keeping only one (a corrupt newest checkpoint has no fallback).
+- **Retention: keep only the newest 1 or 2 checkpoints (default 2, configurable to 1), and delete an older one only once a newer one is known to be saved:** all ranks finished writing (barrier), DCP's own metadata file present, the file count and total size as expected, then `metadata.json`, the rename and `latest`. For async saves the deletion happens when the background write is confirmed, not when it starts. Log each deletion and how long it took (88 GB may take a while on `/staging`). The README explains the trade-off of keeping only one (a corrupt newest checkpoint has no fallback) and gives the footprint for both settings: kept checkpoints plus one being written.
 
 ## Checkpointing specifics
 
@@ -56,7 +68,12 @@ Write a short calculation in the README: 8B parameters × (bf16 weights + fp32 m
 - RNG states and other small per-rank state: save alongside (a per-rank file, or included in the stateful object). Explain the choice.
 - Atomicity: DCP writes many files. Keep the same contract as the other recipes: write into a `.tmp` directory, have all ranks finish (barrier), then rank 0 writes `metadata.json`, renames the directory and updates `latest`. Confirm DCP's own metadata file is present before treating a checkpoint as complete.
 - **Async save:** use `dcp.async_save` for periodic checkpoints. Only one async save may be in flight; wait for the previous one before starting another. On a stop request, wait for any in-flight save before deciding what to do next. Note in comments that async save stages a copy of state in CPU memory, and request enough job memory for it.
-- Periodic in-place saves: every 30 minutes (configurable). Timed exit: `max_runtime_seconds` default 6–10 h (CHTC's suggestion for backfill), weighed against the measured restart cost (model load + FSDP setup); a longer interval may be justified here.
+- **Periodic in-place async saves** (no exit): every 60 minutes on GPU Lab, 30 minutes on backfill (both configurable). These carry the protection against hard kills: on `/staging` each is durable as soon as it's written. Check the interval against P15's save time and the `/staging` traffic it causes (88 GB per hour is ~2 TB a day; worth telling CHTC before long runs).
+- **Timed exit by slot type:**
+  - **GPU Lab (open capacity), the default:** one timed exit just before the `+GPUJobLength` window ends (e.g. `mediumlong` = 72 h: `max_runtime_seconds` ≈ 71 h; save, exit 85). The save is planned rather than squeezed into the 600 s window that reaching the limit with `+is_resumable` would give. Derive it from the chosen job length, so changing one line in the submit file is enough. Confirm that longer job lengths can get 4 GPUs as easily as `short`; otherwise use the longest that does.
+  - **Backfill:** every 6–10 h (CHTC's guidance), plus the 30-minute in-place saves.
+  - **Which applies is decided at every start**, because each execution can land on either kind of slot (the same job may run on backfill, be evicted, and resume on GPU Lab). The job reads `BackfillSlot` from `$_CONDOR_MACHINE_AD` and picks the save interval and the timed exit for this execution, then logs it in plain words, e.g. `running on a BACKFILL slot: saving every 30 min, timed exit after 8 h` (and records `slot_type` in `metrics.jsonl`'s restart marker). The settings are two pairs in `config.yaml` (`save_every_minutes_gpulab/_backfill`, `max_runtime_hours_backfill`), with the GPU Lab timed exit derived from the job length. `htcondor_ckpt/stop.py` provides `slot_kind()` (backfill / glidein / regular / unknown) and `gpu_job_length()` (seconds from `+GPUJobLength`); the recipe maps them to its settings in one small, commented block.
+  - The README and config comments explain the difference, so users don't carry a 72 h interval to the OSPool or backfill.
 
 ### The time-budget decision (central lesson, part 2)
 
@@ -95,8 +112,10 @@ Write the measured numbers and the resulting recommendation into the README. If 
 ## HTCondor files
 
 - `job.sub`, every line commented:
-  - `request_gpus = 4` (parameterized) and generous `request_memory` to cover async-save CPU staging;
-  - `+WantGPULab = true`, `+GPUJobLength`, `+is_resumable = true`;
+  - `request_gpus = 4` (parameterized) and `request_memory` from the measured peak (with or without async saves; see Decisions);
+  - `+WantGPULab = true`, `+GPUJobLength = "mediumlong"` (see Checkpointing specifics), `+is_resumable = true`;
+  - `gpus_minimum_memory = 79000M`, `gpus_minimum_capability = 8.0`, `NCCL_P2P_LEVEL=NVL`;
+  - no slot-type requirement, so the job runs on GPU Lab or backfill, whichever has 4 GPUs free first; commented-out lines for "backfill only" (`TARGET.BackfillSlot =?= true`) and "GPU Lab only" (`TARGET.BackfillSlot =!= true`), each with a one-line explanation of when to use it;
   - `checkpoint_exit_code = 85`, `kill_sig = SIGTERM`, `requirements = HasCHTCStaging =?= true`;
   - checkpoint directory on `/staging`, `--resume auto`;
   - launched through the stop-file wrapper (`htcondor_ckpt/launch.py`).
@@ -113,6 +132,7 @@ Write the measured numbers and the resulting recommendation into the README. If 
 - [ ] Local stop test during an in-flight async save: the job waits for it, exits 85, and resumes correctly.
 - [ ] Resharding test: save on N GPUs, resume on M GPUs, loss continues smoothly.
 - [ ] Resume-equivalence test on a reduced run, with a plot in the README.
+- [ ] A run on a backfill slot and one on a GPU Lab slot: each logs the right slot type, save interval and timed exit; a backfill eviction (real or `condor_vacate_job`) resumes from the last save, wherever the job lands next.
 - [ ] `condor_vacate_job` test with the full-size model: total time from SIGTERM to exit recorded and confirmed under 600 s. Also a timed exit 85 and `-fast` (resumes from the last periodic checkpoint).
 - [ ] `export.py` produces a model that loads in `transformers` and generates sensible text.
 

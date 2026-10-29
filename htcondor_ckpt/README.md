@@ -6,7 +6,7 @@ It isn't an installable package yet. Copy the files you need, or send the direct
 
 | Module | What it does | Needs |
 |---|---|---|
-| [`stop.py`](stop.py) | `StopPolicy`: when to save and stop (HTCondor's SIGTERM, a stop file from `launch.py`, or a runtime limit); `exit_for_restart()` exits 85; `vacate_budget()` reads the vacate window from the job's ads | standard library (uses the `classad` module if installed) |
+| [`stop.py`](stop.py) | `StopPolicy`: when to save and stop (HTCondor's SIGTERM, a stop file from `launch.py`, or a runtime limit); `exit_for_restart()` exits 85; `vacate_budget()` reads the vacate window from the job's ads; `runtime_limit()` / `job_time_left()` shorten the timed exit before glidein ends and access-point limits; `slot_kind()` says whether this execution landed on backfill, an OSPool glidein or a regular slot, and `gpu_job_length()` reads CHTC's `+GPUJobLength`, to pick the save interval and timed exit per execution | standard library (uses the `classad` module if installed) |
 | [`store.py`](store.py) | `CheckpointStore`: write-then-rename checkpoint directories, a `latest` pointer, fallback to an older checkpoint if the newest is damaged, retention, `.tmp` cleanup. Plus `backup()` / `backup_due()` / `load_newest()` for copies on `/staging` that outlive the job | standard library |
 | [`meta.py`](meta.py) | what to record with a checkpoint (config, its hash, reason, versions), config comparison, Python/NumPy RNG state | standard library (NumPy optional) |
 | [`torch_utils.py`](torch_utils.py) | PyTorch pieces: unwrap DDP/`torch.compile` models, torch/CUDA RNG state, `agree()` so all GPUs stop at the same step, save/load a state dict | PyTorch |

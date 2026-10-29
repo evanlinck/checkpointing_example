@@ -39,6 +39,8 @@ test_*_[0-9]*.outputs/
 results/**
 !results/**/
 !results/**/*.md
+# ...and the scripts behind results/gpu-pool-history/summary.md (no host names in them)
+!results/gpu-pool-history/analysis/*.py
 result_*.txt
 *_run*.txt
 # Same rule for reports written inside probes/ (ap_survey.sh's raw .txt files hold job history

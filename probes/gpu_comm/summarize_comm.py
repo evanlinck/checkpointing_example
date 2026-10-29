@@ -24,10 +24,19 @@ def main(run_dir, out_dir):
         check = next((r for r in recs if r["event"] == "check"), None)
         bench = {(r["op"], r["shard_mb"]): r["busbw_gb_s"] for r in recs if r["event"] == "bench"}
         est = next((r for r in recs if r["event"] == "fsdp_estimate"), {})
-        err = open(out[:-4] + ".err", errors="replace").read() if os.path.exists(out[:-4] + ".err") else ""
-        transports = sorted(set(re.findall(r"via (P2P/\S+|SHM/\S+|NET/\S+)", err)))
+        # NCCL writes its INFO lines to stdout; read both files in case that changes.
+        text = open(out, errors="replace").read()
+        if os.path.exists(out[:-4] + ".err"):
+            text += open(out[:-4] + ".err", errors="replace").read()
+        transports = sorted(set(re.findall(r"via (P2P/\S+|SHM/\S+|NET/\S+)", text)))
         topo = start.get("topology", "")
-        links = "NVLink" if re.search(r"\bNV\d+\b", topo) else ("PCIe" if topo.strip() else "?")
+        if re.search(r"\bNV\d+\b", topo):
+            links = "NVLink"
+        elif start.get("nccl_p2p_level") == "NVL" and transports:
+            # With NCCL_P2P_LEVEL=NVL, NCCL copies directly between GPUs only over NVLink.
+            links = "NVLink" if all(t.startswith("P2P") for t in transports) else "no NVLink"
+        else:
+            links = "?"
         gpus = start.get("gpus") or ["?"]
         rows.append({"job": os.path.basename(out)[5:-4], "gpu": gpus[0], "n": start.get("world"),
                      "links": links, "p2p": start.get("nccl_p2p_level"),
@@ -35,16 +44,17 @@ def main(run_dir, out_dir):
                      "transport": ", ".join(transports) or "?",
                      "ag": bench.get(("all_gather", 1024)), "rs": bench.get(("reduce_scatter", 1024)),
                      "step": est.get("seconds_per_step"), "shm": start.get("dev_shm_gb"),
-                     "nccl": start.get("nccl")})
+                     "nccl": start.get("nccl"),
+                     "visible": "%s / %s" % (start.get("device_count") or len(start.get("gpus") or []), start.get("world"))})
     md = ["# GPU communication benchmark", "",
           "From `probes/gpu_comm/` (%d jobs). Bus bandwidth in GB/s at 1 GB per-GPU shards (bf16). "
           "\"FSDP s/step\": estimated communication time per step for a 7.3B model (2 all-gathers of bf16 "
           "weights + 1 reduce-scatter of fp32 gradients), before any overlap with compute." % len(rows), "",
           "| GPU | GPUs | links | NCCL_P2P_LEVEL | start-up check | NCCL transport | all-gather | reduce-scatter "
-          "| FSDP s/step | /dev/shm GB | NCCL |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+          "| FSDP s/step | /dev/shm GB | NCCL | GPUs visible / used |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["gpu"], r["n"] or 0, r["p2p"] or "")):
         md.append("| %(gpu)s | %(n)s | %(links)s | %(p2p)s | %(check)s | %(transport)s | %(ag)s | %(rs)s "
-                  "| %(step)s | %(shm)s | %(nccl)s |" % r)
+                  "| %(step)s | %(shm)s | %(nccl)s | %(visible)s |" % r)
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "summary.md"), "w") as f:
         f.write(redact("\n".join(md) + "\n"))

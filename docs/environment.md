@@ -42,6 +42,7 @@ Notes:
 | PyTorch | `pytorch.sif` = `python:3.12-slim` + CPU wheels → torch **2.14.1+cpu**. No GPU-enabled image tested yet. | P7g, `torchrun2` |
 | `/staging` inside the container | visible and writable on CHTC | P0, P4a, `smoke`/`core-chtc` |
 | `condor_chirp` | present and working on the host (`/usr/libexec/condor/condor_chirp`), **absent inside the container** | P0, `smoke` |
+| HTCondor Python bindings in the shared recipes image (htcondor 25.14.1) | **Work on CHTC CPU, CHTC GPU and the OSPool.** The modules are `classad2` and `htcondor2` (no `classad`/`htcondor`). `classad2` evaluated `MachineMaxVacateTime = 600` from the machine ad. `htcondor2.htchirp.HTChirp()` (with `+WantIOProxy = true`) read `ClusterId`, set `LastCheckpointStep` / `LastCheckpointReason` in 1–100 ms, and both appeared in the event log (`033 attribute_update`) and in `condor_history`. | P16a, `bindings`, 2026-10-28 |
 | Job/machine ads | `$_CONDOR_JOB_AD` and `$_CONDOR_MACHINE_AD` are readable inside the container | P0 |
 | `NumJobStarts` in the sandbox job ad | counts *previous* starts (0 on the first start) and is **not updated** on an exit-85 restart. Don't use it to detect restarts. | P1, `smoke` |
 | Signals ignored at start | none that matter (only SIGPIPE and SIGXFSZ, which Python ignores itself) | P0 |
@@ -139,6 +140,7 @@ Other durability facts:
 | NCCL direct GPU-to-GPU copies over PCIe | **L40 (2 GPUs, no NVLink): work.** With `NCCL_P2P_LEVEL=SYS`, NCCL chose `P2P/CUMEM` (`isAllDirectP2p 1`, `GDR 1`), and an all-reduce took 0.1 s. **RTX PRO 6000 Blackwell (2 GPUs): direct PCIe copies hang.** On two of the four machines, with direct copies allowed (the default, and `NCCL_P2P_LEVEL=SYS`: NCCL chose `P2P/CUMEM`, `isAllDirectP2p 1`), the first all-reduce never completed; NCCL's watchdog aborted it after its timeout (600 s default, 300 s as set by recipe 2). On a third machine, **`NCCL_P2P_LEVEL=NVL` worked**: the all-reduce took 0.0 s and the job trained and saved. So the cause is direct GPU-to-GPU copies over PCIe on these machines (likely their IOMMU/ACS settings), not PCIe in general (they work on L40). Not yet tested: `NVL` and `SYS` on the *same* RTX PRO 6000 machine, and the fourth machine. | recipe 2 smoke run and three `test_htcondor.sh comm` runs, 2026-10-22 |
 | `TORCH_ELASTIC_SHUTDOWN_TIMEOUT=120` (or `--shutdown-timeout`) | Works in torch 2.14.1: both workers finished a 60 s save and exited 85, ~61 s after SIGTERM. Version of introduction unknown. | P7g, `torchrun2` |
 | Stop-file wrapper ([`run_torchrun_stopfile.sh`](../probes/run_torchrun_stopfile.sh)) | **Works without any torchrun feature.** The wrapper turns SIGTERM into a `STOP_REQUESTED` file (no forwarding), workers see it within ~1 s, finish a 60 s save, append to `RESTART_REQUESTED`, exit; the wrapper maps torchrun's exit 1 to 85. With `ON_EXIT_OR_EVICT` the rescheduled job restored the SIGTERM save (step 84). Planned exit 85 also works through it. | P7h, `torchrun3` |
+| GPU-to-GPU speed, H100 (SXM) machine, torch 2.8 / NCCL 2.27.3, shared recipes image | All 8 benchmark jobs landed on the **same** 8-GPU H100 backfill machine. NCCL copied directly between GPUs (`P2P/CUMEM`) with and without `NCCL_P2P_LEVEL=NVL`, so the GPUs are NVLink-connected. Bus bandwidth at 1 GB shards: 340 GB/s (4 GPUs), 270–280 GB/s (2 GPUs), the same with and without `NVL`. Estimated FSDP communication for a 7.3B model: ~0.13 s per step on 4 GPUs (negligible). `nvidia-smi` is not in the container, so the topology wasn't printed. **To check:** the 2-GPU jobs saw 4 GPUs (`torch.cuda.device_count()` = 4); the next run records `CUDA_VISIBLE_DEVICES` and `_CONDOR_AssignedGPUs` | `probes/gpu_comm/`, 2026-10-28 |
 
 ## 7. Storage and transfer speed
 
@@ -154,6 +156,26 @@ Other durability facts:
 | Restart download from `checkpoint_destination = osdf://` | 3.7 min (once, 1 MB) | ~1 min | P6a |
 
 Single run per number; treat these as orders of magnitude.
+
+**Parallel writes and reads on `/staging` (P15, 2026-10-28; 3 rounds about 6 h apart, CHTC CPU and GPU machines, `/staging` mounted as `fuse.ceph-fuse`).** Write = write + fsync of the whole set; read right after writing (an upper bound for a resume on another machine). Rounds 1–2 were similar; round 3 hit a slow period on every machine.
+
+| | Rounds 1–2 | Round 3 (slow period) |
+|---|---|---|
+| Write 20 GB, 1 writer | 300–480 MB/s | 95–250 MB/s |
+| Write 20 GB, 4 or 8 writers | 430–560 MB/s | 190–360 MB/s |
+| Read 20 GB, 1 reader | 100–140 MB/s | 13–82 MB/s (one read took 26 min) |
+| Read 20 GB, 4 readers | 280–500 MB/s | 56–260 MB/s |
+| Read 20 GB, 8 readers | 560–770 MB/s | 31–200 MB/s |
+| **Write 90 GB, 4–8 writers** (GPU machines) | **153–169 s** (530–590 MB/s) | **230–330 s** (270–390 MB/s) |
+| **Read 90 GB, 8 readers** / 4 readers | **105–114 s** / 168–175 s | 233–328 s / 303–316 s |
+| Delete 4–32 files (20–90 GB) | 2–14 s | 2–6 s |
+
+- **Writes top out around 0.5–0.6 GB/s per job.** More writers add only 10–25 %; 1 vs several files per writer makes no consistent difference. The network links were 10–100 Gbit/s, so the limit is `/staging` (or its client), not the network.
+- **Reads need parallel streams.** One reader gets 100–140 MB/s; 8 readers get 5–6× that. A resume should read with several readers (or threads).
+- **Speed varies a lot with time.** The slow round was 2–10× slower, worst for single-stream reads. Plan with the slow numbers.
+- **Free space on `/staging` reports the whole filesystem** (~2.5 PB), not the user's quota, so a job can't check its quota with `statvfs`/`df`.
+- **The machines:** memlock limit 8 MB (`ulimit -l`), `/dev/shm` 270–1,076 GB, 40–256 CPUs, 540–2,150 GB of memory. The probe couldn't read its own memory use from inside the container (cgroup files not visible).
+
 
 ## 8. What this means for the recipes
 
@@ -181,9 +203,9 @@ Single run per number; treat these as orders of magnitude.
 | Effective vacate window from the ads at job start | Planned `vacate_budget()` helper | Log the estimate in probe starts; compare to P3 measurements |
 | ~~OSPool glidein-end eviction~~ | Closed by P12a (§10): no SIGTERM; a hard kill 104–355 s after `GLIDEIN_ToDie` | – |
 | `checkpoint_destination` + `ON_EXIT_OR_EVICT` | Whether the off-AP destination can also carry a SIGTERM save | One P6a variant |
-| Parallel write and read speed on `/staging` (P15) | Recipe 3's ~88 GB sharded checkpoint must be saved well inside the 600 s window; §7 has only single-writer numbers (409 MB/s, 1 GB). Also: host memory, memlock and `/dev/shm` on GPU machines, and whether the page cache counts against the job's memory | `probes/` P15a (20 GB, 1/4/8 writers); P15b at 90 GB after a quota increase |
-| HTCondor's Python bindings in a container (P16) | The 25.x bindings name their modules `classad2` / `htcondor2` (no `classad` module), so `vacate_budget()` silently fell back to plain arithmetic; `stop.py` now tries `classad2` first. Planned `chirp.py` needs `htcondor2.htchirp` to work in a container, on CHTC and the OSPool | `probes/` P16a with the shared recipes image |
-| GPU machines for recipe 3, and GPU-to-GPU speed | Which machines have 4 GPUs of ≥ 40–80 GB, their host memory, how often 4 GPUs are free; how fast all-gather / reduce-scatter run with and without NVLink (FSDP moves ~60 GB per GPU per step for a 7B model) | `probes/gpu_machines.sh` (no jobs), `probes/gpu_comm/` |
+| ~~Parallel write and read speed on `/staging` (P15)~~ Closed: §7 (2026-10-28). Left: memory use during big writes (not visible in the container) | Recipe 3's ~88 GB sharded checkpoint must be saved well inside the 600 s window; §7 has only single-writer numbers (409 MB/s, 1 GB). Also: host memory, memlock and `/dev/shm` on GPU machines, and whether the page cache counts against the job's memory | `probes/` P15a (20 GB, 1/4/8 writers); P15b at 90 GB after a quota increase |
+| ~~HTCondor's Python bindings in a container (P16)~~ Closed: §2 (works on CHTC and the OSPool) | The 25.x bindings name their modules `classad2` / `htcondor2` (no `classad` module), so `vacate_budget()` silently fell back to plain arithmetic; `stop.py` now tries `classad2` first. Planned `chirp.py` needs `htcondor2.htchirp` to work in a container, on CHTC and the OSPool | `probes/` P16a with the shared recipes image |
+| GPU machines for recipe 3 (answered by §11), and GPU-to-GPU speed (partly: only one H100 machine so far, §6; PCIe machines still to measure) | Which machines have 4 GPUs of ≥ 40–80 GB, their host memory, how often 4 GPUs are free; how fast all-gather / reduce-scatter run with and without NVLink (FSDP moves ~60 GB per GPU per step for a 7B model) | `probes/gpu_machines.sh` (no jobs), `probes/gpu_comm/` |
 | GPU-enabled PyTorch image, GPU model on GPU Lab slots | Recipes target H200s; P0 did not record the device name | Build a CUDA image; read `GPUs_DeviceName` in the machine ad |
 
 ## 10. Access points: spool, limits and policy (surveyed)
@@ -271,4 +293,21 @@ Run tags `ospool-r4` (P11d, P13; chtc and ospool from ap2002) and `glidein-end` 
   - The job ad at start had `JobStartDate` and `AllowedJobDuration`. Their sum came 14 s before the hold, so a job can compute its own deadline (`htcondor_ckpt.stop.job_time_left()`).
   - `JobStartDate` is when HTCondor started the job, a few seconds to minutes before the program ran (input transfer, container).
   - On ap2002, jobs get `AllowedExecuteDuration = 259200` (72 h) when they set none.
+
+## 11. GPU pool history (May 2025 – Oct 2026, analyzed 2026-10-28)
+
+From 18 months of 5-minute GPU pool snapshots; full tables, method and caveats in [`results/gpu-pool-history/summary.md`](../results/gpu-pool-history/summary.md). Figures are for Apr–Oct 2026 (85–89 % of the pool claimed) and are upper bounds on availability: "unclaimed" doesn't prove a job could match, and competing jobs are ignored.
+
+| Question | Finding |
+|---|---|
+| Machines a GPU Lab job can use with 4 GPUs of ≥ 75 GB | About 9–11: H200 (8-GPU machines), one H100 machine, four 4-GPU A100-80GB machines, one RTX PRO 6000 machine (Blackwell, PCIe only). The set changes often (A100-80GB machines removed or split into MIG this year; machines moving between GPU Lab and prioritized) |
+| Host resources on those machines | Every one has ≥ 500 GB of host memory and ≥ 48 CPUs. Whenever 4 GPUs were free, ≥ 400 GB of memory and (except one 48-CPU machine) 85+ CPUs were free too. So free memory and CPUs were there; whether large requests take longer to *match* the data can't show, and in the maintainer's experience they do. Keep requests small |
+| How often 4 such GPUs were free on one machine | 18 % of snapshots (GPU Lab), 16 % (backfill); 2 GPUs: 38 %. Month to month 3–34 %; hour of day and weekday matter little (best overnight: 21 % vs 15 % mid-afternoon) |
+| Wait for 4 free GPUs, from a random time | Median ~14 h, 41 % > 1 day, 10 % > 5 days (ignoring competition, so real waits are longer). Free windows last a median 20 min, so the job must already be queued. 2 GPUs: median ~1 h. Requiring one GPU model: 2–3× longer |
+| A 4-GPU job on backfill | Evicted (a primary job takes one of its GPUs) after a median ~14 h on ≥ 75 GB machines (H200 ~10 h); 13 % within 1 h, 28 % within 4 h |
+| CUDA drivers | 570 (CUDA 12.8) or 590 (13.1) on every ≥ 75 GB type seen (Sep–Oct 2026 only; the snapshots have no driver attribute). Some RTX 2080 Ti machines have 550 (12.4). Images must be CUDA ≤ 12.8 builds |
+| MIG | One A100-80GB machine has been split into 8 × 3g.40gb instances since 2026-03-30 (`GPUs_DeviceName` contains "MIG", 40 GB): a ≥ 79 GB memory floor excludes them |
+| Not in the data | Whether a job could match, NVLink, `HasCHTCStaging`, driver history |
+
+**Consequence for multi-GPU jobs:** losing a 4-GPU claim can cost a day of waiting, so every exit 85 carries a small risk (recipe 2: 1 of 5 timed exits was rescheduled instead of restarting in place, §5). Recipe 3 therefore saves in place on `/staging` and, on GPU Lab, makes one timed exit at the end of its job-length window (see `docs/03-fsdp-dcp-finetune.md`).
 

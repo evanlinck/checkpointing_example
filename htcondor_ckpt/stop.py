@@ -18,6 +18,9 @@ Typical use, checked once per training step:
     # On the OSPool, stop before the glidein's hard kill,
     # and before the access point's per-execution limit, if either comes sooner:
     #   seconds, source = runtime_limit(6 * 3600);  policy = StopPolicy(max_runtime_seconds=seconds)
+    # On CHTC, where the same job may land on backfill or GPU Lab, choose per execution:
+    #   if slot_kind() == "backfill": limit = 8 * 3600                       # can be reclaimed
+    #   else: limit = (gpu_job_length() or 12 * 3600) - 3600                 # run to the window
     ...
     for batch in loader:
         train_step(batch)
@@ -188,6 +191,43 @@ def job_time_left(job_ad=None, margin=DEFAULT_LIMIT_MARGIN, now=None):
     return started + allowed - (time.time() if now is None else now) - margin
 
 
+# --------------------------------------------------------------------- where we run
+# CHTC GPU job lengths (+GPUJobLength in the submit file): how long a GPU Lab job may run.
+CHTC_GPU_JOB_HOURS = {"short": 12, "medium": 24, "mediumlong": 72, "long": 168}
+
+
+def slot_kind(machine_ad=None):
+    """What kind of slot this execution landed on, from $_CONDOR_MACHINE_AD:
+
+      "backfill"  a CHTC backfill slot (BackfillSlot = true): free to use, but the GPU's
+                  owner can take it back at any time (SIGTERM, then 600 s)
+      "glidein"   an OSPool glidein (GLIDEIN_ToDie is set): may end with no warning
+      "regular"   any other slot, e.g. CHTC's GPU Lab: runs until the job's length limit
+      "unknown"   no machine ad (not under HTCondor, e.g. a local test)
+
+    A job may land on a different kind after every restart, so call this at start-up and
+    choose the save interval and timed exit for this execution, e.g. save often and exit
+    every 6-10 h on backfill, but run to the end of the job-length window on GPU Lab."""
+    machine_ad = machine_ad or os.environ.get("_CONDOR_MACHINE_AD")
+    if not machine_ad or not os.path.exists(machine_ad):
+        return "unknown"
+    if (_ad_text(machine_ad, "BackfillSlot") or "").lower() == "true":
+        return "backfill"
+    if _ad_text(machine_ad, "GLIDEIN_ToDie") is not None:
+        return "glidein"
+    return "regular"
+
+
+def gpu_job_length(job_ad=None):
+    """Seconds a CHTC GPU Lab job may run, from +GPUJobLength in the job ad (short = 12 h,
+    medium = 24 h, mediumlong = 72 h, long = 168 h), or None if it isn't set. With
+    +is_resumable = true, reaching the limit is an eviction (SIGTERM); planning a timed
+    exit a little before it turns that into an ordinary planned save."""
+    length = (_ad_text(job_ad or os.environ.get("_CONDOR_JOB_AD"), "GPUJobLength") or "").lower()
+    hours = CHTC_GPU_JOB_HOURS.get(length)
+    return hours * 3600 if hours else None
+
+
 # --------------------------------------------------------------------- vacate window
 def vacate_budget(machine_ad=None, job_ad=None, default=DEFAULT_VACATE_SECONDS):
     """Seconds between HTCondor's SIGTERM and its SIGKILL, from the job's ads.
@@ -226,13 +266,21 @@ def _ad_number(path, attr):
         return float(value) if isinstance(value, (int, float)) else None
     except Exception:
         pass
+    expr = _ad_text(path, attr)
+    return _arithmetic(expr) if expr else None
+
+
+def _ad_text(path, attr):
+    """The text after "attr = " in a ClassAd file, with any quotes removed, or None."""
+    if not path or not os.path.exists(path):
+        return None
     expr = None
     with open(path) as f:
         for line in f:
             name, sep, value = line.partition(" = ")
             if sep and name.strip().lower() == attr.lower():
-                expr = value.strip()
-    return _arithmetic(expr) if expr else None
+                expr = value.strip().strip('"')
+    return expr
 
 
 def _arithmetic(expr):

@@ -47,6 +47,9 @@ HOST_SOURCES = [
     # host names never have, so the lookahead skips it.
     re.compile(r"@([A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*)(?![A-Za-z0-9_@-])"),
     re.compile(r'"saved_on_host": "([^"]+)"'),
+    # the Machine attribute, as printed by the probes (Machine=host, "Machine": "host", 'Machine': 'host')
+    re.compile(r"""\bMachine(?:=|["']: ["'])([A-Za-z][A-Za-z0-9.-]*)"""),
+    re.compile(r'"host": "([^"<]+)"'),
 ]
 KEEP_HOST = re.compile(r"^(ap\d+|submit-?\d*)(\.|$)")   # access points are public; keep them
 

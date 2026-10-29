@@ -4,7 +4,7 @@ import signal
 import pytest
 
 from htcondor_ckpt import stop
-from htcondor_ckpt.stop import StopPolicy, job_time_left, runtime_limit, vacate_budget
+from htcondor_ckpt.stop import StopPolicy, gpu_job_length, job_time_left, runtime_limit, slot_kind, vacate_budget
 
 
 class Clock:
@@ -184,3 +184,23 @@ def test_job_time_left(tmp_path):
     assert job_time_left(j, margin=0, now=1000 + 86400) == 13 * 86400
     assert job_time_left(j, now=1000) == 14 * 86400 - 900
     assert job_time_left(write_ad(tmp_path / "j2", JobStartDate="1000")) is None
+
+
+def test_slot_kind(tmp_path, monkeypatch):
+    monkeypatch.delenv("_CONDOR_MACHINE_AD", raising=False)
+    assert slot_kind() == "unknown"
+    assert slot_kind(write_ad(tmp_path / "bf", BackfillSlot="true", Name='"backfill1@host"')) == "backfill"
+    assert slot_kind(write_ad(tmp_path / "lab", BackfillSlot="false")) == "regular"
+    assert slot_kind(write_ad(tmp_path / "plain", Cpus="4")) == "regular"
+    assert slot_kind(write_ad(tmp_path / "os", GLIDEIN_ToDie="1800000000")) == "glidein"
+    monkeypatch.setenv("_CONDOR_MACHINE_AD", write_ad(tmp_path / "env", BackfillSlot="true"))
+    assert slot_kind() == "backfill"
+
+
+def test_gpu_job_length(tmp_path, monkeypatch):
+    monkeypatch.delenv("_CONDOR_JOB_AD", raising=False)
+    assert gpu_job_length() is None
+    assert gpu_job_length(write_ad(tmp_path / "j1", GPUJobLength='"mediumlong"')) == 72 * 3600
+    assert gpu_job_length(write_ad(tmp_path / "j2", GPUJobLength='"Short"')) == 12 * 3600
+    assert gpu_job_length(write_ad(tmp_path / "j3", GPUJobLength='"weekly"')) is None
+

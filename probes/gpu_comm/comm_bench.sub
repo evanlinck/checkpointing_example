@@ -13,7 +13,7 @@ RUN_DIR      = .
 
 universe     = vanilla
 # HOME: the container is read-only. NCCL_P2P_LEVEL is set only when P2P isn't empty.
-# NCCL_DEBUG INFO/INIT: the transport NCCL chose goes to the .err file.
+# NCCL_DEBUG INFO/INIT: the transport NCCL chose goes to the .out file (NCCL logs to stdout).
 shell        = export HOME=$PWD; P2P="$(P2P)"; [ -n "$P2P" ] && export NCCL_P2P_LEVEL=$P2P; exec torchrun --standalone --nproc_per_node=$(NGPUS) comm_bench.py
 transfer_input_files = comm_bench.py
 environment  = "NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT"

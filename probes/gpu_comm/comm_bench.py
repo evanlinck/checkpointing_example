@@ -48,15 +48,21 @@ def machine_info():
             "nccl": ".".join(map(str, torch.cuda.nccl.version())),
             "gpus": [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())],
             "nccl_p2p_level": os.environ.get("NCCL_P2P_LEVEL", "(default)"),
-            "dev_shm_gb": round(shutil.disk_usage("/dev/shm").total / 1e9, 1)}
-    try:   # GPU-to-GPU links: NV# = NVLink, PIX/PXB/PHB/NODE/SYS = PCIe paths of increasing distance
+            "dev_shm_gb": round(shutil.disk_usage("/dev/shm").total / 1e9, 1),
+            # Which GPUs this job may use: a job should see only the GPUs HTCondor assigned to it.
+            "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+            "condor_assigned_gpus": os.environ.get("_CONDOR_AssignedGPUs"),
+            "device_count": torch.cuda.device_count()}
+    # GPU-to-GPU links: NV# = NVLink, PIX/PXB/PHB/NODE/SYS = PCIe paths. nvidia-smi is usually not
+    # inside the container; then the NCCL transport (summarize_comm.py) tells NVLink from PCIe.
+    try:
         info["topology"] = subprocess.run(["nvidia-smi", "topo", "-m"], capture_output=True, text=True,
                                           timeout=30).stdout
     except Exception as e:
         info["topology"] = "nvidia-smi topo failed: %s" % e
     ad = os.environ.get("_CONDOR_MACHINE_AD")
     if ad and os.path.exists(ad):
-        keep = ("GPUs_DeviceName", "TotalGpus", "TotalCpus", "TotalMemory", "CUDADriverVersion", "BackfillSlot")
+        keep = ("GPUs_DeviceName", "TotalGpus", "TotalCpus", "TotalMemory", "GPUs_DriverVersion", "BackfillSlot")
         with open(ad) as f:
             info["machine_ad"] = {k.strip(): v.strip() for k, _, v in (l.partition(" = ") for l in f)
                                   if k.strip() in keep}

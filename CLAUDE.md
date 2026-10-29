@@ -31,6 +31,10 @@ The facts that shape everything below:
 - **OSPool:** HTCondor itself almost never evicts. Real evictions come from glidein ends and may give no SIGTERM, so timed exit-85 checkpoints carry the protection there. No `/staging`.
 - **`/staging`:** fast for few large files, slow for many small ones. The default quota is 100 GB and 1,000 files per user; users can ask CHTC to raise it.
 
+## Guidelines for AI assistants: `docs/llm-guidelines.md` and the skill
+
+`docs/llm-guidelines.md` condenses what we've learned into rules for an LLM writing or reviewing checkpointing jobs (started 2026-10-29). The user's **`htcondor-gpu-checkpointing`** skill carries the same content, adapted to work outside this repo. **Keep both current:** whenever a probe, recipe test or measurement changes or adds to what we know (a new number, an [untested] item becoming [measured], a new failure mode, a closed open item), update `docs/llm-guidelines.md`, then propose the updated skill with `propose_skills` (kind `improvement`, target `htcondor-gpu-checkpointing`, the complete SKILL.md), and update the project copy `claude/checkpointing-guidelines-for-llms.md`. Recipe 3's measurements will replace most of the "Large" section.
+
 ## Environment
 
 - **Access point:** ap2002 (HTCondor 26.1). Execute points run 25.14.
@@ -73,7 +77,7 @@ recipes/
   - `torch_utils.py` is the only file that imports PyTorch;
   - `launch.py` is a standalone script.
 - **Recipes get the modules** through `transfer_input_files` (or a copy inside the recipe directory, generated from `htcondor_ckpt/`, never edited by hand). Each recipe README says which modules it uses.
-- **Readable:** the core stays short enough to read in one sitting (aim for under ~600 lines). It supports Python 3.9+, so it also runs on bare CHTC execute points.
+- **Readable:** the core stays short enough to read in one sitting (aim for under ~700 lines; raised from ~600 on 2026-10-28). The goal is a module people can copy into new projects, so a small helper that saves every user from reading ClassAds by hand belongs here rather than in a recipe. It supports Python 3.9+, so it also runs on bare CHTC execute points.
 - **`classad`:** an *optional* import in `vacate_budget()`, to evaluate the machine and job ads, with a plain-arithmetic fallback.
 - **Planned for later: `condor_chirp` support.** An optional module (e.g. `htcondor_ckpt/chirp.py`) that is skipped cleanly when chirp isn't available. Its use is low-frequency progress reporting: set job attributes like `LastCheckpointStep` / `LastCheckpointReason` once per checkpoint, never per step (updates go through the access point). Never use it to move checkpoints; that's what spool or `/staging` are for (the HTCondor manual also advises against such "manual transfers"). Build it only after a probe confirms chirp works inside a container (via the `htcondor` Python bindings or `htchirp`) on CHTC and the OSPool; P0 found the `condor_chirp` binary on the host but not in a plain Python container.
 - **Keep a short list of what we learn** that would change the package's API (`htcondor_ckpt/NOTES.md`), for when we package it.
@@ -112,7 +116,7 @@ PyTorch specifics:
 
 The job exits with **85** ("state saved, restart me") on two equal, first-class triggers, through one code path (`should_stop()` → save → exit 85):
 
-- **Timed exit** (`max_runtime_seconds`). Defaults follow CHTC's guidance, not the HTCondor manual's generic "about once an hour": **4–6 h on the OSPool (up to 8)** and **6–10 h on CHTC backfill**. A vacate with SIGTERM gets its own save, so the timed interval only bounds what a hard kill can take; weigh it against the cost of one timed checkpoint (save + transfer + restart/restore). This is CHTC's documented pattern. It is cheap, because the restart is usually in place. It is also the only protection against hard kills and OSPool glidein ends. In spool mode it is also *the* periodic checkpoint: a save that stays in scratch is lost on a hard kill. Exception: recipe 2 uses a **1 h demonstration interval**, so that its full run (~3.7 h on 4 A100s) crosses several timed exits. It says so wherever the value appears, next to the real guidance above.
+- **Timed exit** (`max_runtime_seconds`). Defaults follow CHTC's guidance, not the HTCondor manual's generic "about once an hour": **4–6 h on the OSPool (up to 8)** and **6–10 h on CHTC backfill**, where capacity can disappear. On CHTC GPU Lab (open capacity) the job can run until its `+GPUJobLength` window ends, so the timed exit goes just before that. A vacate with SIGTERM gets its own save, so the timed interval only bounds what a hard kill can take; weigh it against the cost of one timed checkpoint (save + transfer + restart/restore). This is CHTC's documented pattern. It is cheap, because the restart is usually in place. It is also the only protection against hard kills and OSPool glidein ends. In spool mode it is also *the* periodic checkpoint: a save that stays in scratch is lost on a hard kill. Exception: recipe 2 uses a **1 h demonstration interval**, so that its full run (~3.7 h on 4 A100s) crosses several timed exits. It says so wherever the value appears, next to the real guidance above. Recipe 3 runs on GPU Lab by default, so it uses that window, and fewer exits also matter there: each exit 85 risks losing a 4-GPU claim that can take a day to get back (pool history, `docs/environment.md` §11).
 - **Eviction** (SIGTERM from a vacate, a hold, backfill preemption, or reaching the GPU runtime limit with `+is_resumable`). See section 3.
 
 Also:
@@ -141,7 +145,7 @@ Resumable checkpoints are distinct from **exported models** (best or final weigh
 
 - Write each checkpoint to a temporary directory (e.g. `step_00012000.tmp/`), flush and `fsync`, then rename it to its final name. Update a `latest` pointer file last, also atomically.
 - On resume, pick the newest *complete* checkpoint. Ignore `.tmp` directories and anything missing `metadata.json`. If the newest fails to load, fall back to the previous one and warn loudly.
-- Keep the last N resumable checkpoints (configurable; default 2, and 1 in spool mode to keep transfers small) plus the best exported model.
+- Keep the last N resumable checkpoints (configurable; default 2, and 1 in spool mode to keep transfers small) plus the best exported model. Delete an older checkpoint only after a newer one is complete (for sharded or async saves: every rank finished and the save verified).
 - Clean up stale `.tmp` directories on startup (a hard kill mid-save leaves them, as measured).
 - **Spool mode:** list **one directory** in `transfer_checkpoint_files` and create it before the first possible exit 85. A listed path that doesn't exist puts the job on hold. Name the same directory in `transfer_output_files`: HTCondor's default output transfer brings back only new top-level files, never directories, so without it `ON_EXIT_OR_EVICT` uploads nothing useful at an eviction (seen in recipe 0's first vacate test).
 - **Backups that outlive the job (spool + `/staging`):** spool checkpoints are deleted when the job leaves the queue (`condor_rm`, removal policies, resubmitting). At timed checkpoints, when `backup_due()`, copy the checkpoint to `/staging/<user>/<run_name>/backups` (`store.backup()`, keep 2). At startup, resume from the newest across both stores (`store.load_newest()`). Name the folder after the run, never the job id. Never back up in the SIGTERM path. Backups only happen at timed checkpoints. Frequency guidance (in `htcondor_ckpt/README.md`): none for runs that fit in one or two timed intervals; at every timed checkpoint for runs up to about a day; about every 12 h for 1–3 days; every 12–24 h for longer runs.
@@ -165,7 +169,7 @@ Storage modes, selected in config and in the submit file:
 | **Staging** | `checkpoint_exit_code = 85`, checkpoint dir under `/staging/<user>/...` passed as an argument, `requirements = HasCHTCStaging =?= true` | CHTC only | Recipes 2–3, large checkpoints |
 
 - **Not recommended:** `checkpoint_destination`. `file://` fails and holds the job. `osdf://` works but restores slowly, and no SIGTERM save through it has been tested.
-- **GPU recipes** set `+is_resumable = true` and `+GPUJobLength`. Submit files document the optional backfill requirement (`TARGET.BackfillSlot =?= true`).
+- **GPU recipes** set `+is_resumable = true` and `+GPUJobLength`. Submit files document the backfill requirement (`TARGET.BackfillSlot =?= true`). We want long jobs to use backfill, which is often free: recipe 3 matches GPU Lab and backfill slots by default and picks its save interval and timed exit from the slot type at every start; later recipes and rewrites should do the same where the checkpoint setup allows it.
 - **Every submit file** has `checkpoint_exit_code = 85`, `kill_sig = SIGTERM`, and a container image loaded via `osdf://`. Every line in user-facing submit files is commented.
 
 ### 7. Logging
